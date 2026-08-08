@@ -123,9 +123,12 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
     </button>
     <span class="viewer-count" id="viewerCount"></span>
-    <a class="vbtn" id="viewerDownload" download aria-label="Download this photo">
+    <a class="vbtn" id="viewerDownload" download aria-label="Download the web-size version">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-3.5-3.5M12 15l3.5-3.5"/><path d="M5 17v1.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V17"/></svg>
     </a>
+    <button type="button" class="vbtn" id="viewerFull" aria-label="Get the full-resolution file">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4H4v5M15 20h5v-5M20 9V4h-5M4 15v5h5"/></svg>
+    </button>
   </div>
   <button type="button" class="vnav prev" id="viewerPrev" aria-label="Previous photo">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7"/></svg>
@@ -138,9 +141,33 @@
   </div>
 </div>
 
+<!-- Supporter prompt. Not a paywall: the bypass is a full-weight button, the
+     copy says the download works either way, and the URL is in the markup. -->
+<div class="gate-scrim" id="gateScrim" hidden></div>
+<div class="gate" id="gate" hidden role="dialog" aria-modal="true" aria-labelledby="gateTitle"
+     data-enabled="1">
+  <h2 id="gateTitle">Full resolution</h2>
+  <p class="gate-body">The web-size version is free and downloads straight away. If the full-size file is worth something to you, a coffee helps keep this going.</p>
+  <p class="gate-file" id="gateFile"></p>
+  <div class="gate-actions">
+    <a class="btn primary gate-support" id="gateSupport" href="https://ko-fi.com/misterclarity" target="_blank" rel="noopener noreferrer">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h12v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8Z"/><path d="M16 9.5h1.8a2.6 2.6 0 0 1 0 5.2H16"/><path d="M7.5 4.5v1.6M10.5 4v2.1M13.5 4.5v1.6"/></svg>
+      <span>Buy me a coffee</span>
+    </a>
+    <a class="btn" id="gateBypass" download>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-3.5-3.5M12 15l3.5-3.5"/><path d="M5 17v1.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V17"/></svg>
+      <span>Download full resolution</span>
+    </a>
+  </div>
+  <p class="gate-note">Honesty box — nothing is checked, and the download works either way.</p>
+  <button type="button" class="gate-close" id="gateClose" aria-label="Close">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+  </button>
+</div>
+
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <script type="module" src="./js/gallery.js"></script>
-<!-- built 2026-08-08T10:26:16.842Z -->
+<!-- built 2026-08-08T11:05:53.417Z -->
 </body>
 </html>

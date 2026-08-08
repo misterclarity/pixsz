@@ -19,6 +19,11 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const IMAGE_RE = /\.(jpe?g|png|webp|avif|gif)$/i;
 
+/* Display variants written by the studio: <stem>-w960.webp beside <stem>.jpg.
+   They are not photos in their own right, so they never enter the photo list.
+   Must stay in step with variantPath() in js/github.js. */
+const VARIANT_RE = /-w(\d+)\.(jpe?g|webp|avif)$/i;
+
 const read = p => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const readJson = (p, fallback) => {
   try { return JSON.parse(read(p)); } catch { return fallback; }
@@ -90,7 +95,7 @@ function walk(dir, out = []) {
   for (const entry of fs.readdirSync(abs, { withFileTypes: true })) {
     const rel = path.posix.join(dir, entry.name);
     if (entry.isDirectory()) walk(rel, out);
-    else if (IMAGE_RE.test(entry.name)) out.push(rel);
+    else if (IMAGE_RE.test(entry.name) && !VARIANT_RE.test(entry.name)) out.push(rel);
   }
   return out;
 }
@@ -121,6 +126,38 @@ function takenAt(rel, stat) {
 const sidecar = readJson('data/photos.json', { photos: [] });
 const byPath = new Map((sidecar.photos || []).map(p => [p.path, p]));
 
+/** Finds <stem>-w<width>.<ext> siblings of a photo. Disk is the authority here
+    rather than the index, so variants are picked up even for photos added
+    outside the studio. */
+function findVariants(rel, fullWidth, fullHeight) {
+  const dir = path.posix.dirname(rel);
+  const stem = path.basename(rel).replace(/\.[^.]+$/, '');
+  const abs = path.join(ROOT, dir);
+  if (!fs.existsSync(abs)) return [];
+
+  return fs.readdirSync(abs)
+    .map(name => {
+      if (!name.startsWith(`${stem}-w`)) return null;
+      const m = name.match(VARIANT_RE);
+      if (!m) return null;
+      const width = Number(m[1]);
+      const ext = m[2].toLowerCase();
+      return {
+        path: path.posix.join(dir, name),
+        width,
+        // Derived rather than re-read: the variant keeps the full image's
+        // aspect ratio by construction, and this avoids a read per file.
+        height: fullHeight && fullWidth
+          ? Math.max(1, Math.round((fullHeight * width) / fullWidth))
+          : 0,
+        format: ext === 'webp' ? 'webp' : ext === 'avif' ? 'avif' : 'jpeg',
+        bytes: fs.statSync(path.join(abs, name)).size,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.width - b.width);
+}
+
 const photos = walk(config.photosDir)
   .map(rel => {
     const stat = fs.statSync(path.join(ROOT, rel));
@@ -131,6 +168,9 @@ const photos = walk(config.photosDir)
 
     const title = (meta.title || '').trim() || titleFromPath(rel);
     const caption = (meta.caption || '').trim();
+
+    const variants = findVariants(rel, dims.width, dims.height);
+    const display = variants.filter(v => v.format !== 'webp' && v.format !== 'avif');
 
     return {
       path: rel,
@@ -143,6 +183,10 @@ const photos = walk(config.photosDir)
       height: dims.height,
       bytes: stat.size,
       takenAt: meta.takenAt || takenAt(rel, stat),
+      variants,
+      // What an <img src> should point at: the largest raster fallback, or the
+      // full file when this photo has no variants yet.
+      display: (display.length ? display[display.length - 1] : null),
     };
   })
   .sort((a, b) => b.takenAt.localeCompare(a.takenAt));
@@ -155,22 +199,68 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => (
 
 const encodePath = p => p.split('/').map(encodeURIComponent).join('/');
 
+/* Matches the .gallery grid in css/gallery.css: one column, then two at 620px,
+   three at 1000px, inside a 1180px wrap with 18px gutters and 26px gaps. If
+   that grid changes, this has to change with it or phones fetch the wrong size. */
+const SIZES = '(min-width: 1180px) 364px, (min-width: 1000px) 31vw, (min-width: 620px) 46vw, 92vw';
+
+function srcset(list) {
+  return list.map(v => `${encodePath(v.path)} ${v.width}w`).join(', ');
+}
+
+/** <picture> with a WebP source and a JPEG fallback. Falls back to a bare <img>
+    on the full-size file for photos uploaded before variants existed. */
+function picture(p, i) {
+  const eager = i < 3;
+  const attrs = `alt="${esc(p.alt)}"`
+    + (p.width ? ` width="${p.width}" height="${p.height}"` : '')
+    + ` loading="${eager ? 'eager' : 'lazy'}" decoding="async"`
+    + (i < 2 ? ' fetchpriority="high"' : '');
+
+  const webp = p.variants.filter(v => v.format === 'webp');
+  const jpeg = p.variants.filter(v => v.format === 'jpeg');
+  const fallbackSrc = encodePath((p.display || p).path);
+
+  if (!webp.length && !jpeg.length) {
+    return `<img src="${fallbackSrc}" ${attrs}>`;
+  }
+
+  const sources = [];
+  if (webp.length) {
+    sources.push(`<source type="image/webp" srcset="${srcset(webp)}" sizes="${SIZES}">`);
+  }
+  if (jpeg.length) {
+    sources.push(`<source type="image/jpeg" srcset="${srcset(jpeg)}" sizes="${SIZES}">`);
+  }
+
+  return `<picture>
+            ${sources.join('\n            ')}
+            <img src="${fallbackSrc}" ${attrs}>
+          </picture>`;
+}
+
 function figures() {
   if (!photos.length) {
     return '<p class="gallery-empty">No photos published yet — check back soon.</p>';
   }
   return photos.map((p, i) => {
-    const src = encodePath(p.path);
+    const full = encodePath(p.path);
+    const web = encodePath((p.display || p).path);
+    const webWidth = (p.display || p).width;
     const ratio = p.width && p.height ? ` style="aspect-ratio:${p.width}/${p.height}"` : '';
-    return `      <figure class="shot" id="p${i + 1}" data-index="${i}"${ratio}>
-        <a class="shot-link" href="${src}" aria-label="View ${esc(p.title)} full size">
-          <img src="${src}" alt="${esc(p.alt)}"${p.width ? ` width="${p.width}" height="${p.height}"` : ''}
-               loading="${i < 3 ? 'eager' : 'lazy'}" decoding="async"${i < 2 ? ' fetchpriority="high"' : ''}>
+
+    // data-full carries the full-resolution URL for the supporter prompt. It is
+    // a plain URL in the markup, not a secret — the gate is a request, not
+    // access control, and pretending otherwise would be dishonest.
+    return `      <figure class="shot" id="p${i + 1}" data-index="${i}"${ratio}
+              data-full="${full}" data-full-width="${p.width}" data-title="${esc(p.title)}">
+        <a class="shot-link" href="${web}" aria-label="View ${esc(p.title)} larger">
+          ${picture(p, i)}
         </a>
         <figcaption>
           <span class="shot-title">${esc(p.title)}</span>
           ${p.caption ? `<span class="shot-caption">${esc(p.caption)}</span>` : ''}
-          <a class="shot-dl" href="${src}" download aria-label="Download ${esc(p.title)}">
+          <a class="shot-dl" href="${web}" download aria-label="Download ${esc(p.title)} at ${webWidth}px">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-3.5-3.5M12 15l3.5-3.5"/><path d="M5 17v1.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V17"/></svg>
             <span>Download</span>
           </a>
@@ -193,10 +283,14 @@ function jsonLd() {
     ...(photos.length ? {
       associatedMedia: photos.map(p => ({
         '@type': 'ImageObject',
-        contentUrl: siteUrl + encodePath(p.path),
+        // The display variant, not the full-size file: this should describe
+        // what the page shows, and it keeps the original out of the graph.
+        contentUrl: siteUrl + encodePath((p.display || p).path),
         name: p.title,
         description: p.alt,
-        ...(p.width ? { width: p.width, height: p.height } : {}),
+        ...((p.display || p).width
+          ? { width: (p.display || p).width, height: (p.display || p).height || p.height }
+          : {}),
         uploadDate: p.takenAt,
         creator: { '@type': 'Person', name: config.author },
         ...(config.license.url ? { license: config.license.url } : {}),
@@ -210,7 +304,7 @@ function jsonLd() {
 function sitemap() {
   const now = new Date().toISOString();
   const images = photos.map(p => `    <image:image>
-      <image:loc>${esc(siteUrl + encodePath(p.path))}</image:loc>
+      <image:loc>${esc(siteUrl + encodePath((p.display || p).path))}</image:loc>
       <image:title>${esc(p.title)}</image:title>
       <image:caption>${esc(p.alt)}</image:caption>
     </image:image>`).join('\n');
@@ -268,7 +362,25 @@ Sitemap: ${siteUrl}sitemap.xml
 
 const kofiUrl = config.kofi.handle ? `https://ko-fi.com/${config.kofi.handle}` : '';
 
-const ogImage = photos.length ? siteUrl + encodePath(photos[0].path) : `${siteUrl}assets/icon-512.png`;
+/* The supporter prompt. Deliberately not a paywall: the full-size URL is in the
+   markup, the bypass is a normal button of equal weight, and the copy says so.
+   Without a Ko-fi handle there is nothing to ask for, so the gate turns itself
+   off and full-resolution downloads go straight through. */
+const gate = {
+  enabled: config.supporterGate?.enabled !== false,
+  title: config.supporterGate?.title || 'Full resolution',
+  body: config.supporterGate?.body
+    || 'The web-size version is free and downloads straight away. If the full-size '
+      + 'file is worth something to you, a coffee helps keep this going.',
+  note: config.supporterGate?.note
+    || 'Honesty box — nothing is checked, and the download works either way.',
+  supportLabel: config.supporterGate?.supportLabel || 'Buy me a coffee',
+  bypassLabel: config.supporterGate?.bypassLabel || 'Download full resolution',
+};
+
+const ogImage = photos.length
+  ? siteUrl + encodePath((photos[0].display || photos[0]).path)
+  : `${siteUrl}assets/icon-512.png`;
 
 const robotsMeta = [
   'index',
@@ -299,6 +411,12 @@ const replacements = {
   KOFI_URL: kofiUrl,
   KOFI_LABEL: config.kofi.label,
   KOFI_BLURB: config.kofi.blurb,
+  GATE_TITLE: gate.title,
+  GATE_BODY: gate.body,
+  GATE_NOTE: gate.note,
+  GATE_SUPPORT: gate.supportLabel,
+  GATE_BYPASS: gate.bypassLabel,
+  GATE_ENABLED: gate.enabled && kofiUrl ? '1' : '0',
   LICENSE_LABEL: config.license.label,
   LICENSE_DETAIL: config.license.detail,
   YEAR: String(new Date().getFullYear()),

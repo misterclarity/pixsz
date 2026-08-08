@@ -138,14 +138,92 @@ makes a page rank — indexing takes days to weeks, and a handful of photos on a
 `github.io` subdomain will not rank quickly. A custom domain helps; consistent
 captions help more.
 
+## Responsive images
+
+The studio generates display variants at upload time and the build emits a
+`<picture>` with WebP and JPEG `srcset`s, so a phone fetches a phone-sized file
+instead of the original:
+
+```
+photos/2026/08/beach.jpg          full resolution — the gated download
+photos/2026/08/beach-w640.webp    display variants, one per width per format
+photos/2026/08/beach-w1080.webp
+photos/2026/08/beach-w1600.jpg    …
+```
+
+Measured on this repo's own gallery, six 2048px photos:
+
+| | Before | After |
+|---|---|---|
+| iPhone 13 (390px, DPR 3) | 1821 KB | **488 KB** |
+| Desktop (1280px, DPR 1) | 1821 KB | **203 KB** |
+
+Widths are set in `site.config.json` and default to `[640, 1080, 1600]`. That
+ladder is tuned for this grid: 640 covers a three-column desktop at DPR 1, and
+1080 is almost exactly what a DPR-2.6/3 phone needs for a full-width tile. If
+you change the grid in `css/gallery.css`, change the `SIZES` constant in
+`tools/build-gallery.mjs` to match, or phones will pick the wrong file.
+
+Each photo costs one upload per width per format on top of the original — with
+the defaults that's up to seven files. Drop `"formats"` to `["webp"]` to halve
+it; WebP is supported everywhere current, and the JPEG set exists only for
+browsers older than Safari 14.
+
+Variants are never upscaled: a 900px-wide photo gets a 640 variant and nothing
+else. Photos uploaded before this existed keep working — the build falls back to
+a plain `<img>` on the full file.
+
 ## Downloads
 
 One photo at a time, by design. Every tile and the viewer carry a plain
 `<a download>` that works with JavaScript off. There is no bulk download on the
 public page.
 
+- **Tile and viewer download** → the largest display variant. Free, instant, no
+  prompt.
+- **Full resolution** (the expand icon in the viewer) → the original, behind the
+  supporter prompt below.
+
 The studio keeps its own **Download all** in Settings — that's your backup of
 your own library, not a visitor-facing feature.
+
+## The supporter prompt
+
+Asking for a Ko-fi before handing over the full-resolution file, in a way that
+is honest about what it is.
+
+**It is not a paywall, and it does not pretend to be one.** A static site cannot
+verify a payment and cannot hide a file the CDN serves publicly. So:
+
+- The bypass is a normal button, the same size and weight as the support one.
+- The copy says the download works either way.
+- The full-resolution URL is in the markup as `data-full`. It has to be.
+- No countdown, no confirm-shaming, no disguised link. Those would buy nothing
+  here — the file is one devtools panel away regardless — and would cost you the
+  goodwill that makes someone tip in the first place.
+
+Going to Ko-fi sets a flag in `localStorage` and the prompt stops appearing.
+Nothing is checked; that's the honest approximation, and it means someone who
+has already given isn't nagged.
+
+Configure or disable it in `site.config.json`:
+
+```jsonc
+"supporterGate": {
+  "enabled": true,        // false → full-resolution downloads go straight through
+  "title": "Full resolution",
+  "body": "…",            // the ask
+  "note": "…",            // the honesty-box disclaimer
+  "supportLabel": "Buy me a coffee",
+  "bypassLabel": "Download full resolution"
+}
+```
+
+Clearing `kofi.handle` also disables it — there is nothing to ask for.
+
+One useful side effect: because the gallery displays variants, the original is
+only reachable through this prompt, and it stays out of `sitemap.xml` and the
+structured data. Crawlers index the web-size images.
 
 ## What "protect the images" can and can't do
 
@@ -167,6 +245,7 @@ directions.
 
 | Measure | Stops | Doesn't stop |
 |---|---|---|
+| Originals not displayed | Casual grabbing of full-res | The supporter prompt's own bypass |
 | Right-click blocked (`contextmenu`) | "Save image as…" | Devtools, view-source, curl, disabling JS |
 | Drag blocked (`dragstart`) | Drag-to-desktop | Same as above |
 | `-webkit-touch-callout: none` | iOS long-press save sheet | Screenshots |
@@ -186,10 +265,10 @@ Download button instead. Right-click still works inside form fields.
 
 **What actually protects work, in rough order of effectiveness:**
 
-1. **Publish web-resolution files only.** The studio already downscales to
-   2048px before upload, so what's public is not your master. Keep the originals
-   off the repo. Drop **Longest edge** in Settings if you want to publish
-   smaller.
+1. **Publish web-resolution files only.** The gallery now displays variants
+   (640–1600px), and the studio downscales to 2048px before upload, so nothing
+   public is your master. Keep the originals off the repo entirely. Drop
+   **Longest edge** in Settings to publish smaller still.
 2. **Watermark.** Nothing here does that yet; say the word and I'll add it to
    the upload pipeline.
 3. **A clear licence,** which the page already states — it's what makes

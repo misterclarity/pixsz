@@ -49,6 +49,18 @@ export function buildPath(dir, name, when = new Date()) {
   return `${prefix}${folder}/${stamp}-${rand}-${slug(name)}.jpg`;
 }
 
+/* Display variants sit beside the full-size file with a width suffix:
+     photos/2026/08/beach.jpg          full resolution (the gated download)
+     photos/2026/08/beach-w960.webp    display variant
+   tools/build-gallery.mjs recognises the same pattern to keep variants out of
+   the photo list — if this changes, VARIANT_RE there has to change with it. */
+export const VARIANT_RE = /-w\d+\.(jpe?g|webp|avif)$/i;
+
+export function variantPath(fullPath, width, format) {
+  const ext = format === 'webp' ? 'webp' : 'jpg';
+  return `${fullPath.replace(/\.[^.]+$/, '')}-w${width}.${ext}`;
+}
+
 export class GitHubStore {
   constructor(config = {}) {
     this.token = config.token || '';
@@ -123,11 +135,38 @@ export class GitHubStore {
     }
 
     const prefix = this.dir ? `${this.dir}/` : '';
-    const files = (tree.tree || [])
-      .filter(n => n.type === 'blob'
-        && n.path.startsWith(prefix)
-        && /\.(jpe?g|png|gif|webp|avif)$/i.test(n.path))
-      .map(n => ({ path: n.path, sha: n.sha, size: n.size }));
+    const images = (tree.tree || []).filter(n => n.type === 'blob'
+      && n.path.startsWith(prefix)
+      && /\.(jpe?g|png|gif|webp|avif)$/i.test(n.path));
+
+    // Display variants live beside their photo. They are not photos in their
+    // own right — they must not become extra tiles — but they do have to be
+    // attached to their parent, or a device that only ever pulled the repo
+    // would leave them behind when the photo is deleted.
+    const variantsByStem = new Map();
+    for (const node of images) {
+      if (!VARIANT_RE.test(node.path)) continue;
+      const stem = node.path.replace(VARIANT_RE, '');
+      const match = node.path.match(/-w(\d+)\.(\w+)$/);
+      if (!variantsByStem.has(stem)) variantsByStem.set(stem, []);
+      variantsByStem.get(stem).push({
+        path: node.path,
+        sha: node.sha,
+        size: node.size,
+        width: Number(match[1]),
+        format: match[2].toLowerCase() === 'webp' ? 'webp' : 'jpeg',
+      });
+    }
+
+    const files = images
+      .filter(n => !VARIANT_RE.test(n.path))
+      .map(n => ({
+        path: n.path,
+        sha: n.sha,
+        size: n.size,
+        variants: (variantsByStem.get(n.path.replace(/\.[^.]+$/, '')) || [])
+          .sort((a, b) => a.width - b.width),
+      }));
 
     return { files, truncated: Boolean(tree.truncated) };
   }

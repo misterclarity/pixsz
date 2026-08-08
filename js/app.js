@@ -1,6 +1,6 @@
 import * as db from './db.js';
 import { processImage, makeThumb, formatBytes } from './imaging.js';
-import { GitHubStore, buildPath } from './github.js';
+import { GitHubStore, buildPath, variantPath } from './github.js';
 import * as settingsStore from './settings.js';
 import { zip } from './zip.js';
 
@@ -22,6 +22,26 @@ const el = {
 
 /** Where the public build reads titles and captions from. */
 const INDEX_PATH = 'data/photos.json';
+
+/* Variant sizes come from site.config.json so the studio and the build can't
+   drift apart. Fetched at boot; these are the fallback if it isn't reachable. */
+let imageConfig = { widths: [640, 1080, 1600], formats: ['webp', 'jpeg'] };
+
+async function loadSiteConfig() {
+  try {
+    const res = await fetch('./site.config.json', { cache: 'no-cache' });
+    if (!res.ok) return;
+    const cfg = await res.json();
+    if (cfg.images && Array.isArray(cfg.images.widths)) {
+      imageConfig = {
+        widths: cfg.images.widths.filter(n => Number.isFinite(n) && n > 0),
+        formats: Array.isArray(cfg.images.formats) ? cfg.images.formats : imageConfig.formats,
+      };
+    }
+  } catch {
+    // Studio still works with the defaults; the build reads whatever is on disk.
+  }
+}
 
 const state = {
   settings: settingsStore.load(),
@@ -52,6 +72,7 @@ async function boot() {
   wireEvents();
   applySettingsToForm();
 
+  await loadSiteConfig();
   state.photos = await db.all();
   render();
   updateSyncPill();
@@ -100,6 +121,8 @@ async function addFiles(fileList) {
         resize: state.settings.resize,
         maxEdge: state.settings.maxEdge,
         quality: state.settings.quality / 100,
+        widths: imageConfig.widths,
+        formats: imageConfig.formats,
       };
       const out = await processImage(file, opts);
 
@@ -119,6 +142,9 @@ async function addFiles(fileList) {
         sha: null,
         error: null,
         remote: false,
+        // [{ width, height, format, blob, path, sha }] — uploaded after the
+        // full-size file, and what the public gallery's srcset is built from.
+        variants: out.variants || [],
       };
 
       await db.put(photo);
@@ -148,7 +174,8 @@ function enqueue(id) {
 }
 
 async function resumePending() {
-  const pending = state.photos.filter(p => p.blob && p.status !== 'synced' && !p.remote);
+  const pending = state.photos.filter(p => p.blob && !p.remote
+    && (p.status !== 'synced' || hasPendingVariants(p)));
   if (!pending.length) return;
   pending.forEach(p => enqueue(p.id));
 }
@@ -169,11 +196,31 @@ async function runQueue() {
     updateQueue();
 
     try {
-      const path = photo.path || buildPath(state.store.dir, photo.name, new Date(photo.createdAt));
+      // Already published and only the variants are outstanding — don't
+      // re-upload the full-size file.
+      if (photo.path && photo.sha) {
+        await uploadVariants(photo);
+        await setStatus(photo, 'synced');
+        updateQueue();
+        continue;
+      }
+
+      const path = buildPath(state.store.dir, photo.name, new Date(photo.createdAt));
       const res = await state.store.upload(path, photo.blob, `Add photo ${path.split('/').pop()}`);
       photo.path = res.path;
       photo.sha = res.sha;
       photo.error = null;
+
+      // Variants go up after the full-size file, in their own try: the photo is
+      // already published at this point, and the gallery falls back to the full
+      // image when a variant is missing. Failing the whole photo here would
+      // report a success as a failure and re-upload bytes that already landed.
+      try {
+        await uploadVariants(photo);
+      } catch (err) {
+        console.warn('Variant upload deferred', photo.path, err);
+      }
+
       await setStatus(photo, 'synced');
     } catch (err) {
       photo.error = err.message || String(err);
@@ -195,6 +242,23 @@ async function runQueue() {
   // New uploads need index entries even before they're captioned — the build
   // uses them for dimensions and dates.
   if (state.photos.some(p => p.path)) markIndexDirty();
+}
+
+/** Uploads any display variants that haven't landed yet. Idempotent, so a
+    later run picks up whatever a dropped connection left behind. */
+async function uploadVariants(photo) {
+  for (const variant of photo.variants || []) {
+    if (variant.path || !variant.blob) continue;
+    const vPath = variantPath(photo.path, variant.width, variant.format);
+    const up = await state.store.upload(vPath, variant.blob, `Add ${vPath.split('/').pop()}`);
+    variant.path = up.path;
+    variant.sha = up.sha;
+    await db.put(photo);
+  }
+}
+
+function hasPendingVariants(photo) {
+  return (photo.variants || []).some(v => v.blob && !v.path);
 }
 
 async function setStatus(photo, status) {
@@ -235,6 +299,9 @@ async function pullRemote({ quiet = false } = {}) {
       sha: f.sha,
       error: null,
       remote: true,
+      // Carried through from the tree listing so this device can clean them up
+      // if the photo is deleted here.
+      variants: f.variants || [],
     }));
     await db.putMany(rows);
     state.photos = state.photos.concat(rows).sort((a, b) => b.createdAt - a.createdAt);
@@ -298,6 +365,9 @@ async function syncIndex() {
       height: photo.height || 0,
       bytes: photo.size || 0,
       takenAt: new Date(photo.createdAt || Date.now()).toISOString(),
+      variants: (photo.variants || [])
+        .filter(v => v.path)
+        .map(v => ({ path: v.path, width: v.width, height: v.height, format: v.format })),
     });
   }
 
@@ -355,6 +425,17 @@ async function deletePhotos(ids) {
   for (const photo of targets) {
     try {
       if (photo.path && photo.sha && state.store) {
+        // Variants first: if the run dies half way, an orphaned variant beside
+        // a deleted photo is invisible, whereas a photo whose variants are gone
+        // still renders from the full-size file.
+        for (const variant of photo.variants || []) {
+          if (!variant.path || !variant.sha) continue;
+          try {
+            await state.store.remove(variant.path, variant.sha);
+          } catch (err) {
+            console.warn('Variant delete failed', variant.path, err);
+          }
+        }
         await state.store.remove(photo.path, photo.sha);
         state.removedPaths.add(photo.path);
       }

@@ -395,3 +395,67 @@ a { color: var(--accent); }
 /* Ko-fi keeps its brand colour as a secondary action: the photos are what the
    page is for, and the ask reads better after the work than in front of it. */
 .kofi-cta { color: var(--kofi); border-color: color-mix(in srgb, var(--kofi) 45%, transparent); }
+
+/* ---------- supporter prompt ---------- */
+
+.gate-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(0, 0, 0, .5);
+}
+
+.gate {
+  position: fixed;
+  z-index: 91;
+  left: 0; right: 0; bottom: 0;
+  padding: 26px max(20px, var(--safe-r)) calc(24px + var(--safe-b)) max(20px, var(--safe-l));
+  background: var(--bg-elev);
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -8px 40px rgba(0, 0, 0, .4);
+  animation: gate-in .24s cubic-bezier(.22, 1, .36, 1);
+}
+
+@keyframes gate-in { from { transform: translateY(100%); } }
+
+@media (min-width: 620px) {
+  .gate {
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    top: 50%;
+    width: 460px;
+    transform: translate(-50%, -50%);
+    border-radius: 18px;
+    animation: none;
+  }
+}
+
+.gate h2 { font-size: 20px; padding-right: 32px; }
+.gate-body { color: var(--fg-dim); font-size: 14.5px; margin: 10px 0 0; }
+.gate-file { font-size: 13.5px; font-weight: 600; margin: 14px 0 0; overflow-wrap: anywhere; }
+
+/* Both actions are the same size on purpose. The bypass is a real choice, not a
+   grudging one — see the note in js/gallery.js. */
+.gate-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.gate-actions .btn { flex: 1 1 190px; }
+.gate-actions .gate-support { background: var(--kofi); color: #fff; border-color: transparent; }
+
+.gate-note { color: var(--fg-dim); font-size: 12.5px; margin: 14px 0 0; }
+
+.gate-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 36px; height: 36px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--fg-dim);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.gate-close:active { background: var(--bg-sunken); }

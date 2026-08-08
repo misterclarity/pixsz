@@ -12,9 +12,13 @@ const shots = Array.from(document.querySelectorAll('.shot')).map(node => {
   const link = node.querySelector('.shot-link');
   return {
     node,
+    // The web-size file: what the viewer shows and what the free download gives.
     url: link.getAttribute('href'),
+    // The original. Behind the supporter prompt, not behind access control.
+    full: node.dataset.full || link.getAttribute('href'),
+    fullWidth: Number(node.dataset.fullWidth) || 0,
     alt: img.getAttribute('alt') || '',
-    title: (node.querySelector('.shot-title') || {}).textContent || '',
+    title: node.dataset.title || '',
     caption: (node.querySelector('.shot-caption') || {}).textContent || '',
   };
 });
@@ -95,8 +99,16 @@ $('viewerClose').addEventListener('click', closeViewer);
 prevBtn.addEventListener('click', () => show(index - 1));
 nextBtn.addEventListener('click', () => show(index + 1));
 
+function gateOpen() {
+  return Boolean(gate) && !gate.hidden;
+}
+
 document.addEventListener('keydown', e => {
   if (!open) return;
+  // The supporter prompt sits on top of the viewer. Without this guard a single
+  // Escape dismisses both, dumping the visitor back to the grid when they only
+  // meant to close the prompt.
+  if (gateOpen()) return;
   if (e.key === 'Escape') closeViewer();
   else if (e.key === 'ArrowRight') show(index + 1);
   else if (e.key === 'ArrowLeft') show(index - 1);
@@ -110,7 +122,7 @@ document.addEventListener('keydown', e => {
   let axis = null;
 
   viewer.addEventListener('pointerdown', e => {
-    if (e.target.closest('button, a')) return;
+    if (e.target.closest('button, a') || gateOpen()) return;
     tracking = true;
     axis = null;
     startX = e.clientX;
@@ -162,6 +174,108 @@ function applyHash() {
 
 window.addEventListener('hashchange', applyHash);
 applyHash();
+
+/* --------------------------------------------- full-resolution prompt */
+
+/* An honesty box, not a paywall. A static site cannot verify a payment and
+   cannot hide a file that the CDN serves publicly, so this does not pretend to:
+   the full-size URL sits in the markup as data-full, the bypass is a normal
+   button the same size as the support one, and the copy says the download works
+   either way. Anything else would be a dark pattern that buys nothing — the
+   file is one devtools panel away regardless. */
+
+const GATE_KEY = 'pixsz.supporter';
+const gate = $('gate');
+const gateScrim = $('gateScrim');
+const gateEnabled = gate && gate.dataset.enabled === '1';
+let gateReturnFocus = null;
+
+function alreadySupported() {
+  try {
+    return localStorage.getItem(GATE_KEY) === '1';
+  } catch {
+    return false;   // private-mode Safari; just show the prompt again
+  }
+}
+
+function rememberSupporter() {
+  try {
+    localStorage.setItem(GATE_KEY, '1');
+  } catch { /* nothing to do — the prompt simply shows next time */ }
+}
+
+function startDownload(url, name) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+function closeGate() {
+  if (!gate) return;
+  gate.hidden = true;
+  gateScrim.hidden = true;
+  document.body.classList.remove('locked');
+  if (gateReturnFocus) gateReturnFocus.focus();
+}
+
+/** Offers the full-resolution file, asking for support first when configured. */
+function requestFull(shot) {
+  const name = filenameOf(shot.full);
+
+  // Nothing to ask for, or they've already been through it once: hand it over.
+  if (!gateEnabled || alreadySupported()) {
+    startDownload(shot.full, name);
+    return;
+  }
+
+  gateReturnFocus = document.activeElement;
+  $('gateFile').textContent = shot.fullWidth
+    ? `${shot.title || name} — ${shot.fullWidth}px wide`
+    : (shot.title || name);
+
+  const bypass = $('gateBypass');
+  bypass.href = shot.full;
+  bypass.setAttribute('download', name);
+
+  gate.hidden = false;
+  gateScrim.hidden = false;
+  document.body.classList.add('locked');
+  bypass.focus();
+}
+
+if (gate) {
+  // Taking the download closes the prompt; the browser handles the <a download>
+  // itself, so nothing here has to cancel or delay it.
+  $('gateBypass').addEventListener('click', () => {
+    closeGate();
+    toast('Thanks for taking it — a coffee is always welcome if it earns its keep.');
+  });
+
+  // We cannot know whether a payment happened. Treating "went to Ko-fi" as
+  // supported is the honest approximation, and it stops the prompt nagging
+  // someone who has already given.
+  $('gateSupport').addEventListener('click', () => {
+    rememberSupporter();
+    setTimeout(closeGate, 150);
+  });
+
+  $('gateClose').addEventListener('click', closeGate);
+  gateScrim.addEventListener('click', closeGate);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !gate.hidden) closeGate();
+  });
+}
+
+const fullBtn = $('viewerFull');
+if (fullBtn) {
+  fullBtn.addEventListener('click', () => {
+    const shot = shots[index];
+    if (shot) requestFull(shot);
+  });
+}
 
 /* ------------------------------------------------- casual-copy friction */
 

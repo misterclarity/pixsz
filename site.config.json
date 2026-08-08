@@ -10,6 +10,20 @@
 
   "photosDir": "photos",
 
+  "images": {
+    "widths": [640, 1080, 1600],
+    "formats": ["webp", "jpeg"]
+  },
+
+  "supporterGate": {
+    "enabled": true,
+    "title": "Full resolution",
+    "body": "The web-size version is free and downloads straight away. If the full-size file is worth something to you, a coffee helps keep this going.",
+    "note": "Honesty box — nothing is checked, and the download works either way.",
+    "supportLabel": "Buy me a coffee",
+    "bypassLabel": "Download full resolution"
+  },
+
   "kofi": {
     "handle": "misterclarity",
     "label": "Support my work",

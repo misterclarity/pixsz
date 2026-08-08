@@ -85,11 +85,16 @@ function fit(w, h, maxEdge) {
 
 /**
  * @param {File|Blob} file
- * @param {{resize?: boolean, maxEdge?: number, quality?: number}} opts
- * @returns {Promise<{blob: Blob, thumb: Blob, width: number, height: number, type: string}>}
+ * @param {{resize?: boolean, maxEdge?: number, quality?: number,
+ *          widths?: number[], formats?: string[]}} opts
+ * @returns {Promise<{blob: Blob, thumb: Blob, width: number, height: number,
+ *                    type: string, variants: Array<object>}>}
  */
 export async function processImage(file, opts = {}) {
-  const { resize = true, maxEdge = 2048, quality = 0.82 } = opts;
+  const {
+    resize = true, maxEdge = 2048, quality = 0.82,
+    widths = [], formats = ['jpeg'],
+  } = opts;
 
   let src;
   try {
@@ -113,10 +118,71 @@ export async function processImage(file, opts = {}) {
     const t = fit(target.w, target.h, THUMB_EDGE);
     const thumb = await encode(draw(src, t.w, t.h), 'image/jpeg', 0.72);
 
-    return { blob: full, thumb, width: target.w, height: target.h, type: 'image/jpeg' };
+    // Display variants for the public gallery's srcset. Everything is drawn
+    // from the one decoded bitmap, so extra widths cost an encode, not a
+    // re-decode — which is the expensive half on a phone.
+    const wanted = await usableFormats(formats);
+    const variants = [];
+
+    for (const width of [...new Set(widths)].sort((a, b) => a - b)) {
+      const size = fitWidth(target.w, target.h, width);
+      if (!size) continue;   // never upscale past what we're storing
+      const canvas = draw(src, size.w, size.h);
+      for (const format of wanted) {
+        variants.push({
+          width: size.w,
+          height: size.h,
+          format,
+          blob: await encode(canvas, MIME[format], format === 'webp' ? quality * 0.95 : quality),
+        });
+      }
+    }
+
+    return {
+      blob: full, thumb, width: target.w, height: target.h, type: 'image/jpeg', variants,
+    };
   } finally {
     if (src.close) src.close();
   }
+}
+
+const MIME = { jpeg: 'image/jpeg', webp: 'image/webp' };
+
+/** Scales to an exact width. srcset's `w` descriptor is a width, so variants
+    have to be sized by width — `fit` constrains the longest edge, which gives
+    the wrong descriptor for portrait photos. */
+function fitWidth(w, h, targetW) {
+  if (targetW >= w) return null;
+  return { w: targetW, h: Math.max(1, Math.round((h * targetW) / w)) };
+}
+
+let webpSupport = null;
+
+/** Safari only gained canvas WebP encoding in 14. Asking the canvas is the
+    only reliable check — a browser that can *decode* WebP may not encode it. */
+async function canEncodeWebp() {
+  if (webpSupport !== null) return webpSupport;
+  try {
+    const probe = document.createElement('canvas');
+    probe.width = 1;
+    probe.height = 1;
+    const blob = await new Promise(res => probe.toBlob(res, 'image/webp', 0.5));
+    webpSupport = Boolean(blob) && blob.type === 'image/webp';
+  } catch {
+    webpSupport = false;
+  }
+  return webpSupport;
+}
+
+async function usableFormats(formats) {
+  const out = [];
+  for (const format of formats) {
+    if (!MIME[format]) continue;
+    if (format === 'webp' && !(await canEncodeWebp())) continue;
+    out.push(format);
+  }
+  // Always leave something behind, even on a browser that can only do JPEG.
+  return out.length ? out : ['jpeg'];
 }
 
 /** Thumbnail-only path, used for photos pulled back down from GitHub. */
