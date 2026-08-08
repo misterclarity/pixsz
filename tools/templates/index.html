@@ -1,27 +1,27 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{LANG}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 
-<title>pixsz — photography by misterclarity</title>
-<meta name="description" content="A personal photo gallery by misterclarity. Browse and download high-resolution photographs for free — and buy me a coffee if any of them are useful to you.">
-<meta name="keywords" content="photography, free photos, download photos, photo gallery, misterclarity">
-<meta name="author" content="misterclarity">
-<link rel="canonical" href="https://misterclarity.github.io/pixsz/">
+<title>{{TITLE}}</title>
+<meta name="description" content="{{DESCRIPTION}}">
+<meta name="keywords" content="{{KEYWORDS}}">
+<meta name="author" content="{{AUTHOR}}">
+<link rel="canonical" href="{{CANONICAL}}">
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
 
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="pixsz">
-<meta property="og:title" content="pixsz — photography by misterclarity">
-<meta property="og:description" content="A personal photo gallery by misterclarity. Browse and download high-resolution photographs for free — and buy me a coffee if any of them are useful to you.">
-<meta property="og:url" content="https://misterclarity.github.io/pixsz/">
-<meta property="og:image" content="https://misterclarity.github.io/pixsz/assets/icon-512.png">
-<meta property="og:locale" content="en">
+<meta property="og:site_name" content="{{SITE_NAME}}">
+<meta property="og:title" content="{{TITLE}}">
+<meta property="og:description" content="{{DESCRIPTION}}">
+<meta property="og:url" content="{{CANONICAL}}">
+<meta property="og:image" content="{{OG_IMAGE}}">
+<meta property="og:locale" content="{{LANG}}">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="pixsz — photography by misterclarity">
-<meta name="twitter:description" content="A personal photo gallery by misterclarity. Browse and download high-resolution photographs for free — and buy me a coffee if any of them are useful to you.">
-<meta name="twitter:image" content="https://misterclarity.github.io/pixsz/assets/icon-512.png">
+<meta name="twitter:title" content="{{TITLE}}">
+<meta name="twitter:description" content="{{DESCRIPTION}}">
+<meta name="twitter:image" content="{{OG_IMAGE}}">
 
 <meta name="theme-color" content="#0d0f14" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
@@ -30,19 +30,7 @@
 <link rel="stylesheet" href="./css/gallery.css">
 
 <script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "ImageGallery",
-  "name": "pixsz — photography by misterclarity",
-  "description": "A personal photo gallery by misterclarity. Browse and download high-resolution photographs for free — and buy me a coffee if any of them are useful to you.",
-  "url": "https://misterclarity.github.io/pixsz/",
-  "inLanguage": "en",
-  "author": {
-    "@type": "Person",
-    "name": "misterclarity",
-    "url": "https://github.com/misterclarity"
-  }
-}
+{{JSON_LD}}
 </script>
 </head>
 <body>
@@ -53,12 +41,12 @@
   <div class="wrap">
     <div class="brand">
       <span class="brand-mark" aria-hidden="true"></span>
-      <span class="brand-name">pixsz</span>
+      <span class="brand-name">{{SITE_NAME}}</span>
     </div>
     <!--KOFI-->
-    <a class="kofi-btn" href="https://ko-fi.com/misterclarity" target="_blank" rel="noopener noreferrer">
+    <a class="kofi-btn" href="{{KOFI_URL}}" target="_blank" rel="noopener noreferrer">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h12v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8Z"/><path d="M16 9.5h1.8a2.6 2.6 0 0 1 0 5.2H16"/><path d="M7.5 4.5v1.6M10.5 4v2.1M13.5 4.5v1.6"/></svg>
-      <span>Support my work</span>
+      <span>{{KOFI_LABEL}}</span>
     </a>
     <!--/KOFI-->
   </div>
@@ -66,33 +54,33 @@
 
 <main>
   <section class="intro wrap">
-    <h1>Photographs, free to download</h1>
-    <p class="lede">A personal photo gallery by misterclarity. Browse and download high-resolution photographs for free — and buy me a coffee if any of them are useful to you.</p>
-    <p class="counts"><strong>0 photos</strong> · free to download · no account needed</p>
+    <h1>{{TAGLINE}}</h1>
+    <p class="lede">{{DESCRIPTION}}</p>
+    <p class="counts"><strong>{{PHOTO_COUNT_LABEL}}</strong> · free to download · no account needed</p>
     <div class="intro-actions">
-      <button type="button" class="btn primary" id="downloadAll" data-count="0">
+      <button type="button" class="btn primary" id="downloadAll" data-count="{{PHOTO_COUNT}}">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-3.5-3.5M12 15l3.5-3.5"/><path d="M5 17v1.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V17"/></svg>
         <span>Download all</span>
       </button>
       <!--KOFI-->
-      <a class="btn" href="https://ko-fi.com/misterclarity" target="_blank" rel="noopener noreferrer">
+      <a class="btn" href="{{KOFI_URL}}" target="_blank" rel="noopener noreferrer">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h12v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8Z"/><path d="M16 9.5h1.8a2.6 2.6 0 0 1 0 5.2H16"/><path d="M7.5 4.5v1.6M10.5 4v2.1M13.5 4.5v1.6"/></svg>
         <span>Buy me a coffee</span>
       </a>
       <!--/KOFI-->
     </div>
-    <p class="licence-line">Free to download for personal use. All rights reserved.</p>
+    <p class="licence-line">{{LICENSE_LABEL}}</p>
   </section>
 
   <section class="gallery wrap" id="gallery" aria-label="Photographs">
-<p class="gallery-empty">No photos published yet — check back soon.</p>
+{{FIGURES}}
   </section>
 
   <!--KOFI-->
   <aside class="support wrap">
-    <h2>Support my work</h2>
-    <p>These photos are free. If one of them earned its keep, a coffee is always welcome — it keeps the camera fed.</p>
-    <a class="btn primary" href="https://ko-fi.com/misterclarity" target="_blank" rel="noopener noreferrer">
+    <h2>{{KOFI_LABEL}}</h2>
+    <p>{{KOFI_BLURB}}</p>
+    <a class="btn primary" href="{{KOFI_URL}}" target="_blank" rel="noopener noreferrer">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h12v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8Z"/><path d="M16 9.5h1.8a2.6 2.6 0 0 1 0 5.2H16"/><path d="M7.5 4.5v1.6M10.5 4v2.1M13.5 4.5v1.6"/></svg>
       <span>Support on Ko-fi</span>
     </a>
@@ -101,14 +89,14 @@
 
   <section class="licence wrap" id="licence">
     <h2>Using these photos</h2>
-    <p>You're welcome to download these and use them privately — wallpapers, prints for your own wall, personal projects. For commercial use, redistribution, or anything published, please get in touch first.</p>
+    <p>{{LICENSE_DETAIL}}</p>
   </section>
 </main>
 
 <footer class="foot wrap">
-  <p>© 2026 misterclarity.</p>
+  <p>© {{YEAR}} {{AUTHOR}}.</p>
   <p class="foot-links">
-    <!--KOFI--><a href="https://ko-fi.com/misterclarity" target="_blank" rel="noopener noreferrer">Ko-fi</a> · <!--/KOFI-->
+    <!--KOFI--><a href="{{KOFI_URL}}" target="_blank" rel="noopener noreferrer">Ko-fi</a> · <!--/KOFI-->
     <a href="#licence">Licence</a>
   </p>
 </footer>
@@ -141,6 +129,6 @@
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <script type="module" src="./js/gallery.js"></script>
-<!-- built 2026-08-08T10:00:38.458Z -->
+<!-- built {{BUILT_AT}} -->
 </body>
 </html>

@@ -1,12 +1,19 @@
-name: Deploy to GitHub Pages
+name: Build gallery and deploy
 
 on:
   push:
     branches: [main]
+    # The build writes these back, so ignoring them here stops the workflow
+    # from re-triggering itself on its own commit.
+    paths-ignore:
+      - 'index.html'
+      - 'sitemap.xml'
+      - 'robots.txt'
+      - 'data/gallery.json'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -15,16 +22,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      # The site is plain static files, so the repo root is the artifact.
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Regenerate the public gallery
+        run: node tools/build-gallery.mjs
+
+      # Committing the output keeps "Pages → deploy from a branch" working for
+      # anyone who prefers that source over the Actions one.
+      - name: Commit regenerated files
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html sitemap.xml robots.txt data/gallery.json
+          if git diff --cached --quiet; then
+            echo "Gallery already up to date."
+          else
+            git commit -m "Rebuild gallery [skip ci]"
+            git push
+          fi
+
+      - uses: actions/configure-pages@v5
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
+
       - id: deploy
         uses: actions/deploy-pages@v4

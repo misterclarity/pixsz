@@ -490,16 +490,52 @@ body.selecting .actionbar { display: none; }
 .lb-top-right { margin-left: auto; display: flex; gap: 2px; }
 .lb-index { font-size: 13px; font-weight: 600; opacity: .85; margin-left: 4px; }
 
-.lb-meta {
+.lb-foot {
   position: absolute;
   left: 0; right: 0; bottom: 0;
   padding: 14px calc(14px + var(--safe-r)) calc(12px + var(--safe-b)) calc(14px + var(--safe-l));
-  color: rgba(255, 255, 255, .82);
+  background: linear-gradient(to top, rgba(0, 0, 0, .78), transparent);
+}
+
+.lb-meta {
+  color: rgba(255, 255, 255, .8);
   font-size: 12.5px;
   text-align: center;
-  background: linear-gradient(to top, rgba(0, 0, 0, .62), transparent);
   pointer-events: none;
 }
+
+/* Captions are edited here rather than in a separate screen: the moment you're
+   looking at a photo is the only moment you know what to call it. */
+.lb-edit { display: grid; gap: 6px; margin-bottom: 10px; }
+
+.lb-edit input,
+.lb-edit textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid rgba(255, 255, 255, .2);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, .08);
+  color: #fff;
+  font: 16px/1.35 inherit;
+  resize: none;
+}
+
+.lb-edit textarea { font-size: 15px; }
+.lb-edit input::placeholder, .lb-edit textarea::placeholder { color: rgba(255, 255, 255, .45); }
+.lb-edit input:focus, .lb-edit textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; background: rgba(0, 0, 0, .5); }
+.lb-edit[hidden] { display: none; }
+
+.brand-out {
+  display: inline-grid;
+  place-items: center;
+  width: 32px; height: 32px;
+  border-radius: 9px;
+  color: var(--fg-dim);
+  text-decoration: none;
+}
+
+.brand-out svg { width: 17px; height: 17px; }
+.brand-out:active { background: var(--bg-sunken); }
 
 /* ---------- settings sheet ---------- */
 

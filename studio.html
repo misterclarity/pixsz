@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>pixsz studio — upload</title>
+<meta name="description" content="Private uploader for the pixsz gallery.">
+<!-- The studio is the private half of the site: an uploader behind a personal
+     token, with nothing a search result should ever point at. -->
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0d0f14" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="pixsz">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./assets/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="./assets/apple-touch-icon.png">
+<link rel="stylesheet" href="./css/styles.css">
+</head>
+<body>
+
+<header class="topbar" id="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <h1>studio</h1>
+      <a class="brand-out" href="./" title="View the public gallery">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-7.5 7.5"/><path d="M18 14v4.5A1.5 1.5 0 0 1 16.5 20h-9A1.5 1.5 0 0 1 6 18.5v-9A1.5 1.5 0 0 1 7.5 8H12"/></svg>
+        <span class="sr-only">View the public gallery</span>
+      </a>
+    </div>
+    <div class="topbar-actions">
+      <button type="button" class="pill" id="syncPill" aria-live="polite">
+        <span class="dot" id="syncDot"></span><span id="syncText">Local</span>
+      </button>
+      <button type="button" class="icon-btn" id="btnSelect" aria-pressed="false" title="Select photos">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11.5 11.5 14 15.5 9"/><rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/></svg>
+        <span class="sr-only">Select photos</span>
+      </button>
+      <button type="button" class="icon-btn" id="btnSettings" title="Settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17.5 7H20M4 17h3M11.5 17H20M4 12h13M20.5 12H20"/><circle cx="15.2" cy="7" r="2.3"/><circle cx="9.2" cy="17" r="2.3"/></svg>
+        <span class="sr-only">Settings</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="selbar" id="selbar" hidden>
+    <button type="button" class="ghost" id="selCancel">Cancel</button>
+    <span class="selcount" id="selCount">0 selected</span>
+    <button type="button" class="ghost" id="selAll">All</button>
+    <button type="button" class="ghost danger" id="selDelete">Delete</button>
+  </div>
+</header>
+
+<main id="main">
+  <section class="queue" id="queue" hidden>
+    <div class="queue-head">
+      <strong id="queueTitle">Processing…</strong>
+      <button type="button" class="ghost small" id="queueClear">Clear</button>
+    </div>
+    <div class="progress"><div class="progress-bar" id="queueBar"></div></div>
+    <ul class="queue-errors" id="queueErrors"></ul>
+  </section>
+
+  <section class="empty" id="empty" hidden>
+    <div class="empty-art" aria-hidden="true">
+      <svg viewBox="0 0 64 64"><rect x="6" y="14" width="52" height="38" rx="7"/><circle cx="32" cy="33" r="10"/><path d="M22 14l4-6h12l4 6"/></svg>
+    </div>
+    <h2>No photos yet</h2>
+    <p>Tap <strong>Add photos</strong> to pick from your camera roll, or use the camera button to take one now.</p>
+  </section>
+
+  <div class="grid" id="grid" role="list"></div>
+
+  <div class="grid-end" id="gridEnd" hidden></div>
+</main>
+
+<nav class="actionbar" id="actionbar">
+  <label class="btn primary" for="filePick">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V5m0 0L7.5 9.5M12 5l4.5 4.5"/><path d="M4 15v2.5A2.5 2.5 0 0 0 6.5 20h11a2.5 2.5 0 0 0 2.5-2.5V15"/></svg>
+    <span>Add photos</span>
+  </label>
+  <label class="btn" for="cameraPick" title="Take a photo">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="3.5"/><circle cx="12" cy="13.5" r="4"/><path d="M9 7l1.5-3h3L15 7"/></svg>
+    <span class="sr-only">Camera</span>
+  </label>
+</nav>
+
+<input type="file" id="filePick" accept="image/*" multiple hidden>
+<input type="file" id="cameraPick" accept="image/*" capture="environment" hidden>
+
+<!-- Drag & drop overlay (desktop) -->
+<div class="dropzone" id="dropzone" hidden><div>Drop photos to upload</div></div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" hidden aria-modal="true" role="dialog" aria-label="Photo viewer">
+  <div class="lb-track" id="lbTrack"></div>
+  <div class="lb-top">
+    <button type="button" class="icon-btn light" id="lbClose" title="Close">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg><span class="sr-only">Close</span>
+    </button>
+    <span class="lb-index" id="lbIndex"></span>
+    <div class="lb-top-right">
+      <button type="button" class="icon-btn light" id="lbShare" title="Share">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4m0 0L8.5 7.5M12 4l3.5 3.5"/><path d="M5 13v5.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V13"/></svg><span class="sr-only">Share</span>
+      </button>
+      <button type="button" class="icon-btn light" id="lbDownload" title="Save">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0l-3.5-3.5M12 15l3.5-3.5"/><path d="M5 17v1.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V17"/></svg><span class="sr-only">Save</span>
+      </button>
+      <button type="button" class="icon-btn light danger" id="lbDelete" title="Delete">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V5h4v2M6.5 7l.8 12.1A1.5 1.5 0 0 0 8.8 20.5h6.4a1.5 1.5 0 0 0 1.5-1.4L17.5 7"/></svg><span class="sr-only">Delete</span>
+      </button>
+    </div>
+  </div>
+  <div class="lb-foot">
+    <div class="lb-edit">
+      <input type="text" id="lbTitle" placeholder="Title" aria-label="Photo title"
+             autocapitalize="sentences" autocorrect="on" spellcheck="true">
+      <textarea id="lbCaption" rows="2" aria-label="Caption and alt text"
+                placeholder="Describe this photo — this becomes the alt text and the caption on the public page"></textarea>
+    </div>
+    <div class="lb-meta" id="lbMeta"></div>
+  </div>
+</div>
+
+<!-- Settings sheet -->
+<div class="sheet-scrim" id="sheetScrim" hidden></div>
+<section class="sheet" id="sheet" hidden aria-modal="true" role="dialog" aria-labelledby="sheetTitle">
+  <div class="sheet-grip" aria-hidden="true"></div>
+  <div class="sheet-head">
+    <h2 id="sheetTitle">Settings</h2>
+    <button type="button" class="icon-btn" id="sheetClose" title="Close">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg><span class="sr-only">Close</span>
+    </button>
+  </div>
+
+  <div class="sheet-body">
+    <div class="field-group">
+      <h3>Image handling</h3>
+      <label class="row" for="setResize">
+        <span><strong>Resize before storing</strong><small>Shrinks huge phone photos. Strips EXIF/GPS metadata.</small></span>
+        <input type="checkbox" id="setResize" class="switch" checked>
+      </label>
+      <label class="row" for="setMaxEdge">
+        <span><strong>Longest edge</strong><small id="setMaxEdgeLabel">2048 px</small></span>
+        <input type="range" id="setMaxEdge" min="720" max="4096" step="128" value="2048">
+      </label>
+      <label class="row" for="setQuality">
+        <span><strong>JPEG quality</strong><small id="setQualityLabel">82%</small></span>
+        <input type="range" id="setQuality" min="50" max="100" step="1" value="82">
+      </label>
+    </div>
+
+    <div class="field-group">
+      <h3>GitHub sync <span class="tag" id="ghTag">off</span></h3>
+      <p class="help">
+        Optional. Commits your photos to a GitHub repo so they survive clearing your
+        browser and sync to your other devices. Without it, photos stay on this device only.
+      </p>
+      <label class="stack" for="ghToken">
+        <span>Fine-grained access token</span>
+        <input type="password" id="ghToken" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="github_pat_…">
+      </label>
+      <p class="help warn">
+        Stored in this browser's localStorage and sent only to api.github.com.
+        Use a <strong>fine-grained</strong> token limited to one repo with
+        <em>Contents: Read and write</em>. Avoid this on a shared device.
+      </p>
+      <div class="two-up">
+        <label class="stack" for="ghOwner"><span>Owner</span>
+          <input type="text" id="ghOwner" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="your-username"></label>
+        <label class="stack" for="ghRepo"><span>Repo</span>
+          <input type="text" id="ghRepo" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="my-photos"></label>
+      </div>
+      <div class="two-up">
+        <label class="stack" for="ghBranch"><span>Branch</span>
+          <input type="text" id="ghBranch" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="main"></label>
+        <label class="stack" for="ghDir"><span>Folder</span>
+          <input type="text" id="ghDir" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="photos"></label>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn" id="ghTest">Test &amp; save</button>
+        <button type="button" class="btn" id="ghPull">Load from repo</button>
+        <button type="button" class="btn danger" id="ghForget">Forget token</button>
+      </div>
+      <p class="status" id="ghStatus" role="status"></p>
+    </div>
+
+    <div class="field-group">
+      <h3>This device</h3>
+      <p class="help" id="storageInfo">—</p>
+      <div class="btn-row">
+        <button type="button" class="btn" id="btnExport">Download all</button>
+        <button type="button" class="btn danger" id="btnWipe">Delete local photos</button>
+      </div>
+    </div>
+
+    <p class="footnote">
+      pixsz runs entirely in your browser. <span id="verLabel"></span>
+    </p>
+  </div>
+</section>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script type="module" src="./js/app.js"></script>
+</body>
+</html>

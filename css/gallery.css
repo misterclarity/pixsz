@@ -1,0 +1,387 @@
+/* Public gallery — the page visitors and crawlers see.
+   Deliberately separate from styles.css (the studio): this page must stay small
+   and fast, since it's the one being measured for search ranking. */
+
+:root {
+  --bg: #f6f7f9;
+  --bg-elev: #ffffff;
+  --bg-sunken: #eceef2;
+  --fg: #12151c;
+  --fg-dim: #5b6272;
+  --line: #dfe3ea;
+  --accent: #3b6ef6;
+  --accent-fg: #ffffff;
+  --kofi: #e0576a;
+  --radius: 14px;
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d0f14;
+    --bg-elev: #171a21;
+    --bg-sunken: #05070a;
+    --fg: #eef1f6;
+    --fg-dim: #949cad;
+    --line: #262b35;
+    --accent: #6d95ff;
+    --accent-fg: #07101f;
+    --kofi: #ff7d90;
+  }
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body.locked { overflow: hidden; }
+
+h1, h2 { margin: 0; font-weight: 650; letter-spacing: -0.02em; line-height: 1.2; }
+
+img { max-width: 100%; }
+
+svg {
+  width: 20px; height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+
+a { color: var(--accent); }
+
+/* Anything that also carries .wrap must set padding-block, never the `padding`
+   shorthand — the shorthand resets padding-inline and drops the gutter. */
+.wrap {
+  max-width: 1180px;
+  margin-inline: auto;
+  padding-inline: max(18px, var(--safe-l)) max(18px, var(--safe-r));
+}
+
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  padding: 10px 16px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  z-index: 100;
+}
+
+.skip:focus { left: 8px; top: 8px; }
+
+/* ---------- masthead ---------- */
+
+.masthead {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  padding-top: var(--safe-t);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: saturate(160%) blur(14px);
+  -webkit-backdrop-filter: saturate(160%) blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+
+.masthead .wrap {
+  height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand { display: flex; align-items: center; gap: 9px; margin-right: auto; }
+.brand-name { font-weight: 700; font-size: 18px; letter-spacing: -0.02em; }
+
+.brand-mark {
+  width: 22px; height: 22px;
+  border-radius: 7px;
+  background: linear-gradient(140deg, #6d95ff, #b06dff 55%, #ff7a9c);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .25);
+}
+
+.kofi-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--kofi);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 650;
+  text-decoration: none;
+  touch-action: manipulation;
+}
+
+.kofi-btn:active { transform: translateY(1px); }
+.kofi-btn svg { width: 18px; height: 18px; }
+
+@media (max-width: 460px) {
+  /* Keep the coffee cup, drop the words — the header must not wrap. */
+  .kofi-btn span { display: none; }
+  .kofi-btn { padding: 0; width: 40px; justify-content: center; }
+}
+
+/* ---------- intro ---------- */
+
+.intro { padding-block: 44px 30px; max-width: 760px; margin-inline: auto; }
+.intro h1 { font-size: clamp(30px, 7vw, 46px); }
+.lede { color: var(--fg-dim); font-size: clamp(16px, 2.4vw, 18px); margin: 14px 0 0; }
+.counts { color: var(--fg-dim); font-size: 14px; margin: 16px 0 0; }
+.licence-line { color: var(--fg-dim); font-size: 13px; margin: 16px 0 0; }
+
+.intro-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 48px;
+  padding: 0 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-elev);
+  color: var(--fg);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 650;
+  text-decoration: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.btn:active { transform: translateY(1px); }
+.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
+.btn:disabled { opacity: .55; cursor: default; }
+
+@media (max-width: 460px) { .intro-actions .btn { flex: 1 1 100%; } }
+
+/* ---------- gallery ---------- */
+
+/* minmax(0, 1fr) rather than 1fr: a grid item's automatic minimum size is its
+   min-content width, so a long caption or a wide image would otherwise push the
+   track past the viewport and give the whole page a horizontal scrollbar. */
+.gallery {
+  padding-block: 10px 40px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 34px;
+}
+
+@media (min-width: 620px) { .gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px; } }
+@media (min-width: 1000px) { .gallery { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+.gallery-empty { grid-column: 1 / -1; text-align: center; color: var(--fg-dim); padding: 40px 0; }
+
+.shot { margin: 0; min-width: 0; }
+
+.shot-link {
+  display: block;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg-sunken);
+  line-height: 0;
+}
+
+.shot-link img {
+  width: 100%;
+  height: auto;
+  display: block;
+  transition: transform .35s cubic-bezier(.22, 1, .36, 1);
+}
+
+@media (hover: hover) {
+  .shot-link:hover img { transform: scale(1.02); }
+}
+
+.shot figcaption {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 11px 2px 0;
+  line-height: 1.45;
+}
+
+.shot-title { font-weight: 650; font-size: 15px; min-width: 0; overflow-wrap: anywhere; }
+.shot-caption { color: var(--fg-dim); font-size: 14px; flex: 1 1 100%; order: 3; min-width: 0; overflow-wrap: anywhere; }
+
+.shot-dl {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  color: var(--fg-dim);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  touch-action: manipulation;
+}
+
+.shot-dl svg { width: 15px; height: 15px; }
+.shot-dl:active { transform: translateY(1px); }
+
+/* ---------- support + licence ---------- */
+
+.support, .licence {
+  max-width: 760px;
+  margin-inline: auto;
+  padding-block: 30px;
+}
+
+.support {
+  text-align: center;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.support h2, .licence h2 { font-size: 20px; }
+.support p, .licence p { color: var(--fg-dim); margin: 10px 0 20px; }
+.licence p { margin-bottom: 0; }
+.support .btn.primary { background: var(--kofi); color: #fff; }
+
+.foot {
+  max-width: 760px;
+  margin-inline: auto;
+  padding-block: 28px calc(36px + var(--safe-b));
+  color: var(--fg-dim);
+  font-size: 13.5px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  justify-content: space-between;
+  border-top: 1px solid var(--line);
+}
+
+.foot p { margin: 0; }
+
+/* ---------- viewer ---------- */
+
+.viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: #000;
+  display: grid;
+  place-items: center;
+  touch-action: none;
+}
+
+.viewer-stage {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: calc(60px + var(--safe-t)) 8px calc(72px + var(--safe-b));
+}
+
+.viewer-stage img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  -webkit-user-drag: none;
+  user-select: none;
+  pointer-events: none;
+}
+
+.viewer-bar {
+  position: absolute;
+  left: 0; right: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px max(12px, var(--safe-r)) 10px max(12px, var(--safe-l));
+  color: #fff;
+}
+
+.viewer-top { top: 0; padding-top: calc(10px + var(--safe-t)); background: linear-gradient(to bottom, rgba(0, 0, 0, .65), transparent); }
+.viewer-bottom { bottom: 0; padding-bottom: calc(12px + var(--safe-b)); background: linear-gradient(to top, rgba(0, 0, 0, .65), transparent); }
+.viewer-bottom p { margin: 0 auto; font-size: 13.5px; text-align: center; color: rgba(255, 255, 255, .85); }
+.viewer-count { font-size: 13px; font-weight: 600; opacity: .8; margin-right: auto; }
+
+.vbtn {
+  width: 44px; height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.vbtn:active { background: rgba(255, 255, 255, .14); }
+
+.vnav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px; height: 48px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .1);
+  color: #fff;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.vnav.prev { left: 10px; }
+.vnav.next { right: 10px; }
+.vnav:disabled { opacity: .25; cursor: default; }
+
+/* Arrows are a pointer affordance; on touch the gesture is a swipe. */
+@media (hover: none) and (pointer: coarse) { .vnav { display: none; } }
+
+/* ---------- toast ---------- */
+
+.toast {
+  position: fixed;
+  z-index: 90;
+  left: 50%;
+  bottom: calc(24px + var(--safe-b));
+  transform: translateX(-50%);
+  max-width: min(92vw, 420px);
+  padding: 11px 16px;
+  border-radius: 12px;
+  background: #12151c;
+  color: #fff;
+  font-size: 13.5px;
+  text-align: center;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .4);
+}
+
+@media (prefers-color-scheme: dark) { .toast { background: #2a303c; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}

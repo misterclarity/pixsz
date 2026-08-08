@@ -164,6 +164,56 @@ export class GitHubStore {
     return { path: res.content.path, sha: res.content.sha, url: res.content.download_url };
   }
 
+  /** Reads a JSON file, returning its sha so it can be written back safely. */
+  async readJson(path) {
+    const encoded = path.split('/').map(encodeURIComponent).join('/');
+    try {
+      const res = await this.request(
+        `/repos/${this.owner}/${this.repo}/contents/${encoded}?ref=${encodeURIComponent(this.branch)}`,
+      );
+      // Base64 from the API arrives with newlines, which atob rejects.
+      const text = new TextDecoder().decode(
+        Uint8Array.from(atob(res.content.replace(/\s/g, '')), c => c.charCodeAt(0)),
+      );
+      return { data: JSON.parse(text), sha: res.sha };
+    } catch (err) {
+      if (err.status === 404) return { data: null, sha: null };
+      throw err;
+    }
+  }
+
+  /**
+   * Writes JSON, retrying once against a fresh sha. Two devices editing
+   * captions at the same time is rare but a lost update is silent, so the
+   * caller passes a merge function rather than a finished blob.
+   */
+  async writeJson(path, build, message) {
+    const encoded = path.split('/').map(encodeURIComponent).join('/');
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const { data, sha } = await this.readJson(path);
+      const next = build(data);
+      const body = {
+        message: message || `Update ${path}`,
+        content: await blobToBase64(new Blob([`${JSON.stringify(next, null, 2)}\n`])),
+        branch: this.branch,
+        ...(sha ? { sha } : {}),
+      };
+      try {
+        const res = await this.request(
+          `/repos/${this.owner}/${this.repo}/contents/${encoded}`,
+          { method: 'PUT', body: JSON.stringify(body) },
+        );
+        return res.content.sha;
+      } catch (err) {
+        // 409/422 here means someone else wrote first; re-read and reapply.
+        if ((err.status === 409 || err.status === 422) && attempt === 0) continue;
+        throw err;
+      }
+    }
+    throw new GitHubError('Could not update the photo index — try again', 409);
+  }
+
   async remove(path, sha, message) {
     const encoded = path.split('/').map(encodeURIComponent).join('/');
     await this.request(`/repos/${this.owner}/${this.repo}/contents/${encoded}`, {

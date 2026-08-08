@@ -5,15 +5,18 @@
    the files somewhere the page can pick them up. Keep DB_NAME/DB_VERSION and
    the `inbox` store in step with js/db.js. */
 
-const VERSION = 'pixsz-v1';
+const VERSION = 'pixsz-v2';
 const DB_NAME = 'pixsz';
 const DB_VERSION = 1;
 
 const SHELL = [
   './',
   './index.html',
+  './studio.html',
+  './css/gallery.css',
   './css/styles.css',
   './js/app.js',
+  './js/gallery.js',
   './js/db.js',
   './js/github.js',
   './js/imaging.js',
@@ -59,11 +62,17 @@ self.addEventListener('fetch', event => {
   if (url.origin !== self.location.origin) return;
 
   if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .catch(() => caches.match('./index.html', { ignoreSearch: true }))
-        .then(res => res || fetch(request)),
-    );
+    event.respondWith((async () => {
+      try {
+        return await fetch(request);
+      } catch {
+        // Offline: fall back to the requested page, then to the gallery.
+        return (await caches.match(request, { ignoreSearch: true }))
+          || (await caches.match('./studio.html', { ignoreSearch: true }))
+          || (await caches.match('./index.html', { ignoreSearch: true }))
+          || new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain' } });
+      }
+    })());
     return;
   }
 
@@ -82,7 +91,7 @@ self.addEventListener('fetch', event => {
 /* --------------------------------------------------------- share target */
 
 async function handleShare(event) {
-  const redirect = new URL('./?shared=1', self.registration.scope);
+  const redirect = new URL('./studio.html?shared=1', self.registration.scope);
   try {
     const form = await event.request.formData();
     const files = [

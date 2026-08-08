@@ -4,7 +4,7 @@ import { GitHubStore, buildPath } from './github.js';
 import * as settingsStore from './settings.js';
 import { zip } from './zip.js';
 
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 const $ = id => document.getElementById(id);
 
 const el = {
@@ -16,8 +16,12 @@ const el = {
   dropzone: $('dropzone'), toast: $('toast'),
   sheet: $('sheet'), sheetScrim: $('sheetScrim'),
   lightbox: $('lightbox'), lbTrack: $('lbTrack'), lbIndex: $('lbIndex'), lbMeta: $('lbMeta'),
+  lbTitle: $('lbTitle'), lbCaption: $('lbCaption'), lbEdit: document.querySelector('.lb-edit'),
   selbar: $('selbar'), selCount: $('selCount'),
 };
+
+/** Where the public build reads titles and captions from. */
+const INDEX_PATH = 'data/photos.json';
 
 const state = {
   settings: settingsStore.load(),
@@ -30,6 +34,7 @@ const state = {
   done: 0,
   total: 0,
   errors: [],
+  removedPaths: new Set(),
   lb: { open: false, index: 0 },
 };
 
@@ -57,7 +62,9 @@ async function boot() {
   wireFileHandler();
 
   if (state.store && state.store.configured) {
-    pullRemote({ quiet: true }).catch(err => console.warn('Initial sync skipped:', err));
+    pullRemote({ quiet: true })
+      .then(loadIndex)
+      .catch(err => console.warn('Initial sync skipped:', err));
     resumePending();
   }
 
@@ -185,6 +192,9 @@ async function runQueue() {
   state.working = false;
   updateQueue();
   updateSyncPill();
+  // New uploads need index entries even before they're captioned — the build
+  // uses them for dimensions and dates.
+  if (state.photos.some(p => p.path)) markIndexDirty();
 }
 
 async function setStatus(photo, status) {
@@ -256,6 +266,78 @@ function dateFromPath(path) {
   return 0;
 }
 
+/* ------------------------------------------- caption index (data/photos.json) */
+
+let indexTimer = null;
+
+/** Titles and captions are what the public build turns into alt text, so every
+    edit has to reach the repo. Debounced: typing a caption shouldn't commit
+    once per keystroke. */
+function markIndexDirty() {
+  if (!state.store) return;
+  clearTimeout(indexTimer);
+  indexTimer = setTimeout(() => {
+    syncIndex().catch(err => {
+      console.warn('Index sync failed', err);
+      toast(`Captions not saved: ${err.message}`);
+    });
+  }, 1500);
+}
+
+async function syncIndex() {
+  if (!state.store || !state.store.configured) return;
+
+  const local = new Map();
+  for (const photo of state.photos) {
+    if (!photo.path) continue;
+    local.set(photo.path, {
+      path: photo.path,
+      title: (photo.title || '').trim(),
+      caption: (photo.caption || '').trim(),
+      width: photo.width || 0,
+      height: photo.height || 0,
+      bytes: photo.size || 0,
+      takenAt: new Date(photo.createdAt || Date.now()).toISOString(),
+    });
+  }
+
+  await state.store.writeJson(INDEX_PATH, remote => {
+    // Start from whatever is in the repo so captions written on another device
+    // survive, then let this device's edits win for the photos it knows about.
+    const merged = new Map((remote && remote.photos ? remote.photos : []).map(p => [p.path, p]));
+    for (const [path, entry] of local) merged.set(path, entry);
+    for (const path of state.removedPaths) merged.delete(path);
+
+    return {
+      updatedAt: new Date().toISOString(),
+      photos: [...merged.values()].sort((a, b) => (b.takenAt || '').localeCompare(a.takenAt || '')),
+    };
+  }, 'Update photo captions');
+
+  state.removedPaths.clear();
+}
+
+/** Pulls titles/captions down so they show on a device that didn't write them. */
+async function loadIndex() {
+  if (!state.store || !state.store.configured) return;
+  const { data } = await state.store.readJson(INDEX_PATH);
+  if (!data || !data.photos) return;
+
+  const meta = new Map(data.photos.map(p => [p.path, p]));
+  let touched = 0;
+  for (const photo of state.photos) {
+    const entry = photo.path && meta.get(photo.path);
+    if (!entry) continue;
+    if (photo.title !== entry.title || photo.caption !== entry.caption) {
+      photo.title = entry.title || '';
+      photo.caption = entry.caption || '';
+      await db.put(photo);
+      touched++;
+    }
+  }
+  if (touched && state.lb.open) updateLightboxChrome();
+}
+
 /* ------------------------------------------------------------ deleting */
 
 async function deletePhotos(ids) {
@@ -274,6 +356,7 @@ async function deletePhotos(ids) {
     try {
       if (photo.path && photo.sha && state.store) {
         await state.store.remove(photo.path, photo.sha);
+        state.removedPaths.add(photo.path);
       }
     } catch (err) {
       // Local removal still happens — leaving a ghost tile the user can't get
@@ -291,6 +374,7 @@ async function deletePhotos(ids) {
   exitSelection();
   render();
   updateStorageInfo();
+  if (state.removedPaths.size) markIndexDirty();
   if (failed) toast(`Removed locally, but ${failed} could not be deleted from GitHub`);
 }
 
@@ -606,6 +690,13 @@ function updateLightboxChrome() {
   const photo = state.photos[state.lb.index];
   if (!photo) return;
   el.lbIndex.textContent = `${state.lb.index + 1} / ${state.photos.length}`;
+
+  // Captions only reach the public page through the repo index, so there's
+  // nothing to edit until a photo has actually been uploaded.
+  el.lbEdit.hidden = !photo.path;
+  el.lbTitle.value = photo.title || '';
+  el.lbCaption.value = photo.caption || '';
+
   const bits = [
     photo.createdAt ? new Date(photo.createdAt).toLocaleString() : null,
     photo.width ? `${photo.width}×${photo.height}` : null,
@@ -615,8 +706,28 @@ function updateLightboxChrome() {
   el.lbMeta.textContent = bits.join(' · ');
 }
 
+/** Commits whatever is in the caption fields to the photo currently shown. */
+async function saveCaption() {
+  const photo = state.photos[state.lb.index];
+  if (!photo || el.lbEdit.hidden) return;
+
+  const title = el.lbTitle.value.trim();
+  const caption = el.lbCaption.value.trim();
+  if ((photo.title || '') === title && (photo.caption || '') === caption) return;
+
+  photo.title = title;
+  photo.caption = caption;
+  await db.put(photo);
+  markIndexDirty();
+}
+
 function goTo(index) {
-  state.lb.index = Math.max(0, Math.min(state.photos.length - 1, index));
+  const next = Math.max(0, Math.min(state.photos.length - 1, index));
+  if (next === state.lb.index) { positionTrack(0); return; }
+
+  // Save before the index moves, or the edit lands on the wrong photo.
+  saveCaption().catch(err => console.warn('Caption save failed', err));
+  state.lb.index = next;
   positionTrack(0);
   paintSlides();
   updateLightboxChrome();
@@ -733,6 +844,7 @@ async function testAndSave() {
     updateSyncPill();
     ghStatus(`Connected to ${repo.full_name} (${repo.private ? 'private' : 'public'})`, 'ok');
     resumePending();
+    loadIndex().catch(err => console.warn('Caption load failed', err));
   } catch (err) {
     ghStatus(err.message || 'Could not connect', 'err');
   }
@@ -907,7 +1019,16 @@ function wireEvents() {
   wireGridInput();
   wireLightboxGestures();
 
-  $('lbClose').addEventListener('click', closeLightbox);
+  el.lbTitle.addEventListener('change', saveCaption);
+  el.lbCaption.addEventListener('change', saveCaption);
+  el.lbTitle.addEventListener('blur', saveCaption);
+  el.lbCaption.addEventListener('blur', saveCaption);
+  // Keep the swipe handler out of the text fields.
+  [el.lbTitle, el.lbCaption].forEach(node => {
+    node.addEventListener('pointerdown', e => e.stopPropagation());
+  });
+
+  $('lbClose').addEventListener('click', async () => { await saveCaption(); closeLightbox(); });
   $('lbDelete').addEventListener('click', async () => {
     const photo = state.photos[state.lb.index];
     if (!photo) return;
@@ -936,7 +1057,7 @@ function wireEvents() {
 
   document.addEventListener('keydown', e => {
     if (state.lb.open) {
-      if (e.key === 'Escape') closeLightbox();
+      if (e.key === 'Escape') { saveCaption(); closeLightbox(); }
       if (e.key === 'ArrowRight') goTo(state.lb.index + 1);
       if (e.key === 'ArrowLeft') goTo(state.lb.index - 1);
       return;
@@ -966,7 +1087,9 @@ function wireEvents() {
   $('setQuality').addEventListener('change', () => settingsStore.save(state.settings));
 
   $('ghTest').addEventListener('click', testAndSave);
-  $('ghPull').addEventListener('click', () => pullRemote().catch(err => ghStatus(err.message, 'err')));
+  $('ghPull').addEventListener('click', () => pullRemote()
+    .then(loadIndex)
+    .catch(err => ghStatus(err.message, 'err')));
   $('ghForget').addEventListener('click', forgetToken);
   $('btnExport').addEventListener('click', exportAll);
   $('btnWipe').addEventListener('click', wipeLocal);

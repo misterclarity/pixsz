@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+
+# The studio is the private uploader — nothing there is useful to a crawler.
+Disallow: /studio.html
+
+Sitemap: https://misterclarity.github.io/pixsz/sitemap.xml

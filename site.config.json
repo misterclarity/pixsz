@@ -1,0 +1,29 @@
+{
+  "url": "https://misterclarity.github.io/pixsz/",
+  "siteName": "pixsz",
+  "title": "pixsz — photography by misterclarity",
+  "tagline": "Photographs, free to download",
+  "description": "A personal photo gallery by misterclarity. Browse and download high-resolution photographs for free — and buy me a coffee if any of them are useful to you.",
+  "author": "misterclarity",
+  "authorUrl": "https://github.com/misterclarity",
+  "locale": "en",
+
+  "photosDir": "photos",
+
+  "kofi": {
+    "handle": "misterclarity",
+    "label": "Support my work",
+    "blurb": "These photos are free. If one of them earned its keep, a coffee is always welcome — it keeps the camera fed."
+  },
+
+  "license": {
+    "label": "Free to download for personal use. All rights reserved.",
+    "detail": "You're welcome to download these and use them privately — wallpapers, prints for your own wall, personal projects. For commercial use, redistribution, or anything published, please get in touch first.",
+    "url": ""
+  },
+
+  "seo": {
+    "keywords": ["photography", "free photos", "download photos", "photo gallery", "misterclarity"],
+    "twitter": ""
+  }
+}
