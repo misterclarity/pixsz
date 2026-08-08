@@ -4,7 +4,7 @@ A personal photo site that runs entirely on GitHub Pages. Two halves:
 
 | | | |
 |---|---|---|
-| **`/`** | Public gallery | Pre-rendered, indexable, free downloads, Ko-fi link |
+| **`/`** | Public gallery | Pre-rendered, indexable, one-at-a-time downloads, Ko-fi link |
 | **`/studio.html`** | Private uploader | Mobile-first, `noindex`, upload from your phone |
 
 No build tooling, no framework, no server. Node is used once, in CI, to render
@@ -20,8 +20,8 @@ document, so nothing would ever be indexed.
 
 So `tools/build-gallery.mjs` renders the gallery ahead of time — real `<img>`
 tags, real alt text, real captions in the HTML — and CI runs it whenever photos
-change. The public page needs no JavaScript to work at all; the viewer and the
-bulk download are enhancements layered on top.
+change. The public page needs no JavaScript to work at all; the viewer is an
+enhancement layered on top.
 
 ## The flow
 
@@ -140,10 +140,74 @@ captions help more.
 
 ## Downloads
 
-- Per-photo `<a download>` on every tile and in the viewer — works with JS off.
-- **Download all** zips the gallery client-side (store-only, no compression —
-  JPEGs don't deflate). It's held in memory, so it refuses above ~600 MB and
-  tells the visitor to download individually.
+One photo at a time, by design. Every tile and the viewer carry a plain
+`<a download>` that works with JavaScript off. There is no bulk download on the
+public page.
+
+The studio keeps its own **Download all** in Settings — that's your backup of
+your own library, not a visitor-facing feature.
+
+## What "protect the images" can and can't do
+
+Read this before relying on any of it.
+
+**The honest baseline:** this is a static site on a public CDN. Every photo is a
+plain file at a guessable URL, and it *has* to be, or browsers couldn't render
+the page. `curl https://…/photos/2026/08/whatever.jpg` returns the bytes. No
+amount of client-side JavaScript changes that, because the protection would run
+on the attacker's machine.
+
+There is also a direct tension with what this site is for: you asked for it to
+be **findable on search engines**. Googlebot is a scraper. `sitemap.xml` exists
+precisely to hand every image URL to crawlers. You cannot be maximally
+discoverable and maximally un-scrapeable at once — the dials point in opposite
+directions.
+
+**What's implemented, and what each thing is worth:**
+
+| Measure | Stops | Doesn't stop |
+|---|---|---|
+| Right-click blocked (`contextmenu`) | "Save image as…" | Devtools, view-source, curl, disabling JS |
+| Drag blocked (`dragstart`) | Drag-to-desktop | Same as above |
+| `-webkit-touch-callout: none` | iOS long-press save sheet | Screenshots |
+| No bulk download | One-click grab of the set | A ten-line loop over `sitemap.xml` |
+| `robots.txt` AI-crawler blocks | GPTBot, ClaudeBot, CCBot, Google-Extended, PerplexityBot, Bytespider and ~15 more | Anything that doesn't send an honest user-agent |
+| `noai, noimageai` meta | Some AI crawlers | The rest |
+
+The robots.txt blocks are the only measure that meaningfully changes outcomes,
+because those operators publish their user-agents and honour the directive.
+Everything else is friction that a determined person steps over in seconds. It's
+worth having — most casual copying *is* casual — but don't mistake it for
+access control.
+
+The right-click block is deliberately not silent: a menu that fails to open
+reads as a broken page, so the gallery shows a short message pointing at the
+Download button instead. Right-click still works inside form fields.
+
+**What actually protects work, in rough order of effectiveness:**
+
+1. **Publish web-resolution files only.** The studio already downscales to
+   2048px before upload, so what's public is not your master. Keep the originals
+   off the repo. Drop **Longest edge** in Settings if you want to publish
+   smaller.
+2. **Watermark.** Nothing here does that yet; say the word and I'll add it to
+   the upload pipeline.
+3. **A clear licence,** which the page already states — it's what makes
+   unauthorised use actionable rather than ambiguous.
+4. **Don't publish it.** The only complete protection.
+
+Tuning knobs in `site.config.json`:
+
+```jsonc
+"seo":     { "imagePreview": "large" },   // "standard" shrinks Google's image
+                                          // previews — less scrape-friendly,
+                                          // worse image-search click-through
+"protect": {
+  "blockAiCrawlers": true,                // the robots.txt block list
+  "noaiMeta": true,                       // adds noai, noimageai
+  "extraBlockedAgents": []                // add your own user-agents
+}
+```
 
 ## Licensing
 
@@ -181,7 +245,7 @@ tools/build-gallery.mjs   the build
 tools/templates/index.html  gallery template
 tools/make-icons.py       regenerates assets/*.png
 
-css/gallery.css  js/gallery.js     public gallery
+css/gallery.css  js/gallery.js     public gallery (no zip.js — single downloads only)
 studio.html  css/styles.css        uploader
 js/app.js                          wiring, grid, queue, lightbox, captions
 js/db.js  js/imaging.js  js/github.js  js/settings.js  js/zip.js

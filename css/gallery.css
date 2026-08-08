@@ -208,6 +208,12 @@ a { color: var(--accent); }
   height: auto;
   display: block;
   transition: transform .35s cubic-bezier(.22, 1, .36, 1);
+  /* Suppresses the iOS long-press "Save Image" sheet and the desktop drag
+     ghost. Friction only — see the note in js/gallery.js. */
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 @media (hover: hover) {
@@ -385,3 +391,7 @@ a { color: var(--accent); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
 }
+
+/* Ko-fi keeps its brand colour as a secondary action: the photos are what the
+   page is for, and the ask reads better after the work than in front of it. */
+.kofi-cta { color: var(--kofi); border-color: color-mix(in srgb, var(--kofi) 45%, transparent); }

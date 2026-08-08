@@ -2,10 +2,8 @@
  *
  * Strictly progressive enhancement: the page is complete without this file.
  * Every photo is already a real <img> inside a link to the full-size file, and
- * every download is a plain <a download>. This adds a viewer and a bulk
- * download on top — if the script fails, nothing a visitor needs is lost. */
-
-import { zip } from './zip.js';
+ * every download is a plain <a download>. This adds a viewer on top — if the
+ * script fails, nothing a visitor needs is lost. */
 
 const $ = id => document.getElementById(id);
 
@@ -148,12 +146,16 @@ document.addEventListener('keydown', e => {
    navigation that never re-runs this module. */
 function applyHash() {
   const match = location.hash.match(/^#p(\d+)$/);
-  if (!match) {
+  const n = match ? Number(match[1]) - 1 : -1;
+
+  // Anything that isn't a live photo index — no hash, or a link to a photo
+  // that has since been removed — means "not viewing". Returning early here
+  // instead would strand an open viewer over the page.
+  if (n < 0 || n >= shots.length) {
     if (open) closeViewer();
     return;
   }
-  const n = Number(match[1]) - 1;
-  if (n < 0 || n >= shots.length) return;
+
   if (open) show(n);
   else openViewer(n);
 }
@@ -161,71 +163,38 @@ function applyHash() {
 window.addEventListener('hashchange', applyHash);
 applyHash();
 
-/* -------------------------------------------------------- download all */
+/* ------------------------------------------------- casual-copy friction */
+
+/* What this does and doesn't do, so nobody is misled by it later:
+   it stops a right-click "Save image as…", a drag-to-desktop, and a long-press
+   save sheet on mobile. It does not stop anyone who opens devtools, reads the
+   page source, or runs curl against the image URL — those are all still one
+   step away, because the files are public static assets on a CDN and have to be
+   for the page to render at all. Treat this as a "please don't", not a lock. */
 
 let toastTimer = null;
-function toast(message, ms = 4000) {
+function toast(message, ms = 3500) {
   const node = $('toast');
+  if (!node) return;
   node.textContent = message;
   node.hidden = false;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { node.hidden = true; }, ms);
 }
 
-const allBtn = $('downloadAll');
+document.addEventListener('contextmenu', e => {
+  // Never swallow the menu inside text a visitor might legitimately copy, or
+  // inside a form field.
+  if (e.target.closest('input, textarea, [contenteditable]')) return;
+  e.preventDefault();
 
-if (!shots.length) {
-  allBtn.disabled = true;
-} else {
-  allBtn.addEventListener('click', async () => {
-    const label = allBtn.querySelector('span');
-    const original = label.textContent;
-    allBtn.disabled = true;
+  // A menu that silently fails to open reads as a broken page. Say what
+  // happened and point at the button that does work.
+  if (e.target.closest('img')) {
+    toast('Right-click is off here — use the Download button under each photo.');
+  }
+});
 
-    try {
-      const entries = [];
-      let bytes = 0;
-
-      for (let i = 0; i < shots.length; i++) {
-        label.textContent = `Fetching ${i + 1} of ${shots.length}…`;
-        const res = await fetch(shots[i].url);
-        if (!res.ok) throw new Error(`Could not fetch ${filenameOf(shots[i].url)}`);
-        const blob = await res.blob();
-        bytes += blob.size;
-
-        // Everything is held in memory to build the archive, so stop before a
-        // phone browser gets killed rather than after.
-        if (bytes > 600 * 1024 * 1024) {
-          throw new Error('This gallery is too large to zip in the browser — download photos individually instead');
-        }
-        entries.push({ name: uniqueName(entries, filenameOf(shots[i].url)), blob });
-      }
-
-      label.textContent = 'Packing…';
-      const bundle = await zip(entries);
-      const url = URL.createObjectURL(bundle);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${document.title.split(' ')[0] || 'photos'}-${new Date().toISOString().slice(0, 10)}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
-      toast(`Downloaded ${entries.length} photos`);
-    } catch (err) {
-      toast(err.message || 'Download failed', 6000);
-    } finally {
-      label.textContent = original;
-      allBtn.disabled = false;
-    }
-  });
-}
-
-function uniqueName(entries, name) {
-  const taken = new Set(entries.map(e => e.name));
-  if (!taken.has(name)) return name;
-  let n = 1;
-  let candidate;
-  do { candidate = name.replace(/(\.\w+)$/, `-${n++}$1`); } while (taken.has(candidate));
-  return candidate;
-}
+document.addEventListener('dragstart', e => {
+  if (e.target.closest('img')) e.preventDefault();
+});

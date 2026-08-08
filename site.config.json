@@ -3,7 +3,7 @@
   "siteName": "pixsz",
   "title": "pixsz — photography by misterclarity",
   "tagline": "Photographs, free to download",
-  "description": "A personal photo gallery by misterclarity. Browse and download high-resolution photographs for free — and buy me a coffee if any of them are useful to you.",
+  "description": "A personal photo gallery by misterclarity. Browse and download the photographs for free — and buy me a coffee if any of them are useful to you.",
   "author": "misterclarity",
   "authorUrl": "https://github.com/misterclarity",
   "locale": "en",
@@ -24,6 +24,13 @@
 
   "seo": {
     "keywords": ["photography", "free photos", "download photos", "photo gallery", "misterclarity"],
-    "twitter": ""
+    "twitter": "",
+    "imagePreview": "large"
+  },
+
+  "protect": {
+    "blockAiCrawlers": true,
+    "noaiMeta": true,
+    "extraBlockedAgents": []
   }
 }

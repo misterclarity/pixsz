@@ -229,13 +229,39 @@ ${images}
 `;
 }
 
+/* Crawlers that identify themselves and honour robots.txt: AI training
+   scrapers, dataset builders and content harvesters. Blocking them here is the
+   one anti-scraping measure on this site that actually does something, because
+   these operators publish their user-agents and respect the directive.
+   Nothing stops an anonymous script — see the README. */
+const AI_CRAWLERS = [
+  'GPTBot', 'ChatGPT-User', 'OAI-SearchBot',          // OpenAI
+  'ClaudeBot', 'Claude-Web', 'anthropic-ai',          // Anthropic
+  'Google-Extended',                                  // Google AI training (not Search)
+  'Applebot-Extended',                                // Apple AI training (not Search)
+  'meta-externalagent', 'FacebookBot',                // Meta
+  'Amazonbot', 'Bytespider', 'PerplexityBot',
+  'CCBot',                                            // Common Crawl
+  'Diffbot', 'ImagesiftBot', 'Omgilibot', 'Timpibot',
+  'cohere-ai', 'YouBot', 'Scrapy', 'img2dataset',
+];
+
 function robots() {
-  return `User-agent: *
+  const blocked = [
+    ...(config.protect.blockAiCrawlers ? AI_CRAWLERS : []),
+    ...(config.protect.extraBlockedAgents || []),
+  ];
+
+  const blocks = blocked.map(agent => `User-agent: ${agent}\nDisallow: /`).join('\n\n');
+
+  return `# Search engines are welcome: this site exists to be found.
+User-agent: *
 Allow: /
 
 # The studio is the private uploader — nothing there is useful to a crawler.
 Disallow: /studio.html
 
+${blocked.length ? `# Declined: AI training and bulk-harvesting crawlers.\n# Only effective for bots that identify themselves and obey this file.\n${blocks}\n` : ''}
 Sitemap: ${siteUrl}sitemap.xml
 `;
 }
@@ -244,7 +270,18 @@ const kofiUrl = config.kofi.handle ? `https://ko-fi.com/${config.kofi.handle}` :
 
 const ogImage = photos.length ? siteUrl + encodePath(photos[0].path) : `${siteUrl}assets/icon-512.png`;
 
+const robotsMeta = [
+  'index',
+  'follow',
+  `max-image-preview:${config.seo.imagePreview || 'large'}`,
+  'max-snippet:-1',
+  // A declaration, not a control: honoured by some AI crawlers, ignored by the
+  // rest. It costs nothing and it states intent on the record.
+  ...(config.protect.noaiMeta ? ['noai', 'noimageai'] : []),
+].join(', ');
+
 const replacements = {
+  ROBOTS_META: robotsMeta,
   LANG: config.locale || 'en',
   TITLE: config.title,
   SITE_NAME: config.siteName,
