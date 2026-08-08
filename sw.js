@@ -5,28 +5,30 @@
    the files somewhere the page can pick them up. Keep DB_NAME/DB_VERSION and
    the `inbox` store in step with js/db.js. */
 
-const VERSION = 'pixsz-v2';
+const VERSION = 'pixsz-v3';
+const PHOTOS = 'pixsz-photos-v1';
 const DB_NAME = 'pixsz';
 const DB_VERSION = 1;
 
+/* One worker serves both halves of the site, because two registrations cannot
+   share a scope. Only the public gallery is precached: it is what visitors
+   land on, and precaching the studio would make every visitor download an
+   uploader they will never open. Studio assets are still cached, just on first
+   use by the runtime handler below. */
 const SHELL = [
   './',
   './index.html',
-  './studio.html',
   './css/gallery.css',
-  './css/styles.css',
-  './js/app.js',
   './js/gallery.js',
-  './js/db.js',
-  './js/github.js',
-  './js/imaging.js',
-  './js/settings.js',
-  './js/zip.js',
   './manifest.webmanifest',
   './assets/icon-192.png',
-  './assets/icon-512.png',
   './assets/apple-touch-icon.png',
 ];
+
+/* Display variants only. Originals are large, rarely opened, and would evict
+   everything else; the browser's own cache can handle those. */
+const CACHEABLE_PHOTO = /-w\d+\.(jpe?g|webp|avif)$/i;
+const PHOTO_CACHE_LIMIT = 120;
 
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
@@ -41,10 +43,38 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.filter(k => k !== VERSION).map(k => caches.delete(k)));
+    // The photo cache is keyed by URL and photo URLs are immutable, so it
+    // survives shell version bumps rather than being re-downloaded.
+    await Promise.all(keys
+      .filter(k => k !== VERSION && k !== PHOTOS)
+      .map(k => caches.delete(k)));
     await self.clients.claim();
   })());
 });
+
+/** Oldest-first eviction. Cache.keys() preserves insertion order. */
+async function trimPhotoCache() {
+  const cache = await caches.open(PHOTOS);
+  const keys = await cache.keys();
+  if (keys.length <= PHOTO_CACHE_LIMIT) return;
+  await Promise.all(keys.slice(0, keys.length - PHOTO_CACHE_LIMIT).map(k => cache.delete(k)));
+}
+
+/* Cache-first: a photo at a given URL never changes its bytes — the studio
+   writes a new date-stamped filename for every upload — so there is nothing to
+   revalidate and a cache hit can be served without touching the network. */
+async function servePhoto(request) {
+  const cache = await caches.open(PHOTOS);
+  const hit = await cache.match(request);
+  if (hit) return hit;
+
+  const res = await fetch(request);
+  if (res && res.ok && res.type === 'basic') {
+    await cache.put(request, res.clone());
+    trimPhotoCache().catch(() => {});
+  }
+  return res;
+}
 
 self.addEventListener('fetch', event => {
   const { request } = event;
@@ -57,9 +87,14 @@ self.addEventListener('fetch', event => {
 
   if (request.method !== 'GET') return;
 
-  // Photo bytes and API calls are never cached here: they're either huge,
-  // credentialed, or both. IndexedDB is the app's real offline store.
+  // Never touch api.github.com or raw.githubusercontent.com: credentialed,
+  // and the studio's real offline store is IndexedDB.
   if (url.origin !== self.location.origin) return;
+
+  if (CACHEABLE_PHOTO.test(url.pathname)) {
+    event.respondWith(servePhoto(request).catch(() => caches.match(request)));
+    return;
+  }
 
   if (request.mode === 'navigate') {
     event.respondWith((async () => {

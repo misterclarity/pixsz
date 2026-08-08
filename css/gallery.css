@@ -193,6 +193,12 @@ a { color: var(--accent); }
 
 .gallery-empty { grid-column: 1 / -1; text-align: center; color: var(--fg-dim); padding: 40px 0; }
 
+/* No content-visibility here on purpose. It was measured at 66 photos on a
+   4x-throttled phone profile and made no difference (2403ms vs 2407ms of scroll
+   work, zero long tasks either way) — loading="lazy" already defers the
+   expensive part — while its size estimates made the scroll height wrong for
+   tiles that had never been rendered. Past a few hundred photos the answer is
+   pagination, not this. */
 .shot { margin: 0; min-width: 0; }
 
 .shot-link {
@@ -203,11 +209,14 @@ a { color: var(--accent); }
   line-height: 0;
 }
 
+/* The blur-up placeholder is painted as the link's background by the build.
+   Scaling a 16px JPEG to tile size is the blur — no filter needed, so there's
+   no compositing cost while scrolling. */
 .shot-link img {
   width: 100%;
   height: auto;
   display: block;
-  transition: transform .35s cubic-bezier(.22, 1, .36, 1);
+  transition: transform .35s cubic-bezier(.22, 1, .36, 1), opacity .3s ease;
   /* Suppresses the iOS long-press "Save Image" sheet and the desktop drag
      ghost. Friction only — see the note in js/gallery.js. */
   -webkit-touch-callout: none;
@@ -215,6 +224,11 @@ a { color: var(--accent); }
   -webkit-user-select: none;
   user-select: none;
 }
+
+/* Only fade when JS is present to add .lit — without it the image must be
+   visible immediately, since the page has to work with no script at all. */
+.js .shot-link img { opacity: 0; }
+.js .shot-link img.lit { opacity: 1; }
 
 @media (hover: hover) {
   .shot-link:hover img { transform: scale(1.02); }

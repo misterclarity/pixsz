@@ -173,6 +173,60 @@ Variants are never upscaled: a 900px-wide photo gets a 640 variant and nothing
 else. Photos uploaded before this existed keep working — the build falls back to
 a plain `<img>` on the full file.
 
+The viewer has its own `<picture>` with the same srcsets at `sizes="100vw"`, so
+opening a photo full-screen also fetches a screen-sized file rather than the
+largest one.
+
+## Repeat visits and offline
+
+GitHub Pages serves assets with a ten-minute cache lifetime and there is no way
+to configure that, so a visitor returning an hour later would re-download every
+photo. `sw.js` fixes it with a cache-first store for display variants:
+
+| | Transferred | Photos over the network |
+|---|---|---|
+| First visit | 348 KB | 4 of 6 |
+| Repeat visit | **28 KB** | 0 of 6 |
+| Offline | — | all 6 still render |
+
+Photo URLs are immutable — every upload gets a fresh date-stamped filename — so
+a cache hit needs no revalidation. The cache holds 120 variants and evicts
+oldest-first. Full-resolution originals are deliberately *not* cached: they're
+large, rarely opened, and would evict everything useful.
+
+One service worker serves both halves of the site, because two registrations
+can't share a scope. Only the gallery is precached; the studio's assets are
+cached on first use, so a visitor never downloads an uploader they'll never open.
+
+## Placeholders
+
+Each tile carries a blurred 16px version of its own photo, inlined as a data URI
+and scaled up by CSS, so a slow connection shows the picture's colours instead
+of a grey box. The real image fades in over it.
+
+That costs roughly **1 KB of HTML per photo** — JPEG's quantization and Huffman
+tables dominate at that size, so it doesn't get much smaller. Past a couple of
+hundred photos, switch to the average colour instead:
+
+```jsonc
+"images": { "placeholder": "blur" }   // "color" = one hex value per photo
+                                      // "none"  = no placeholder
+```
+
+Placeholders are computed by the studio and travel in `data/photos.json`. The
+build has no image decoder, so photos added by hand simply don't get one.
+
+### Two things deliberately not done
+
+- **`content-visibility: auto` on tiles.** Measured at 66 photos on a
+  4×-throttled phone profile: 2403 ms of scroll work with it, 2407 ms without,
+  zero long tasks either way. `loading="lazy"` already defers the expensive
+  part, and its size estimates made the scroll height wrong for tiles never
+  rendered. Past a few hundred photos the answer is pagination, not this.
+- **A Web Worker for the studio's image processing.** Six 2048px photos at 4×
+  CPU throttle produced 242 ms of total blocking, worst task 72 ms. Not worth
+  the complexity.
+
 ## Downloads
 
 One photo at a time, by design. Every tile and the viewer carry a plain

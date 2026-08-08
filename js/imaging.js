@@ -138,12 +138,68 @@ export async function processImage(file, opts = {}) {
       }
     }
 
+    const placeholder = await makePlaceholder(src, target.w, target.h);
+
     return {
-      blob: full, thumb, width: target.w, height: target.h, type: 'image/jpeg', variants,
+      blob: full, thumb, width: target.w, height: target.h, type: 'image/jpeg',
+      variants, ...placeholder,
     };
   } finally {
     if (src.close) src.close();
   }
+}
+
+/** Width of the blur-up placeholder. Small enough that the base64 stays under
+    a kilobyte, which matters because it's inlined into the gallery HTML once
+    per photo — see the note about large galleries in the README. */
+const LQIP_EDGE = 16;
+
+/**
+ * Two cheap placeholders drawn from the same downscale:
+ *   lqip   a 16px JPEG as a data URI, blurred up by CSS while the real file loads
+ *   color  the average colour, for galleries big enough that inlining LQIPs hurts
+ */
+async function makePlaceholder(src, w, h) {
+  const size = fitWidth(w, h, LQIP_EDGE) || { w, h };
+  const canvas = draw(src, size.w, size.h);
+  const ctx = canvas.getContext('2d');
+
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  let n = 0;
+  try {
+    const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    for (let i = 0; i < data.length; i += 4) {
+      r += data[i];
+      g += data[i + 1];
+      b += data[i + 2];
+      n++;
+    }
+  } catch {
+    // getImageData can throw on a tainted canvas; the LQIP still works.
+  }
+
+  const hex = n
+    ? `#${[r / n, g / n, b / n].map(v => Math.round(v).toString(16).padStart(2, '0')).join('')}`
+    : '#888888';
+
+  let lqip = '';
+  try {
+    const blob = await encode(canvas, 'image/jpeg', 0.4);
+    lqip = await blobToDataUrl(blob);
+  } catch { /* placeholder is optional */ }
+
+  return { lqip, color: hex };
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
 }
 
 const MIME = { jpeg: 'image/jpeg', webp: 'image/webp' };

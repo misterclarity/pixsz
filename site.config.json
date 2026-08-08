@@ -12,7 +12,8 @@
 
   "images": {
     "widths": [640, 1080, 1600],
-    "formats": ["webp", "jpeg"]
+    "formats": ["webp", "jpeg"],
+    "placeholder": "blur"
   },
 
   "supporterGate": {

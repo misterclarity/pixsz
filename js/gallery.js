@@ -7,10 +7,22 @@
 
 const $ = id => document.getElementById(id);
 
+// Marks the page as script-enabled so CSS can fade images in. Without JS the
+// rule never applies and images show immediately.
+document.documentElement.classList.add('js');
+
 const shots = Array.from(document.querySelectorAll('.shot')).map(node => {
   const img = node.querySelector('img');
   const link = node.querySelector('.shot-link');
+  const source = type => {
+    const el = node.querySelector(`picture source[type="${type}"]`);
+    return el ? el.getAttribute('srcset') : '';
+  };
   return {
+    // The tile's own srcsets, reused by the viewer so a phone opens a
+    // phone-sized file instead of the largest variant.
+    webpSet: source('image/webp'),
+    jpegSet: source('image/jpeg'),
     node,
     // The web-size file: what the viewer shows and what the free download gives.
     url: link.getAttribute('href'),
@@ -28,8 +40,16 @@ const viewerImg = $('viewerImg');
 const viewerCount = $('viewerCount');
 const viewerCaption = $('viewerCaption');
 const viewerDownload = $('viewerDownload');
+const viewerWebp = $('viewerWebp');
+const viewerJpeg = $('viewerJpeg');
 const prevBtn = $('viewerPrev');
 const nextBtn = $('viewerNext');
+
+function setSource(node, srcset) {
+  if (!node) return;
+  if (srcset) node.setAttribute('srcset', srcset);
+  else node.removeAttribute('srcset');
+}
 
 let index = 0;
 let open = false;
@@ -42,6 +62,9 @@ function show(i) {
   index = Math.max(0, Math.min(shots.length - 1, i));
   const shot = shots[index];
 
+  // srcset before src, so the browser never starts the fallback request first.
+  setSource(viewerWebp, shot.webpSet);
+  setSource(viewerJpeg, shot.jpegSet);
   viewerImg.src = shot.url;
   viewerImg.alt = shot.alt;
   viewerDownload.href = shot.url;
@@ -51,9 +74,15 @@ function show(i) {
   prevBtn.disabled = index === 0;
   nextBtn.disabled = index === shots.length - 1;
 
-  // Warm the neighbours so a swipe doesn't land on a blank frame.
+  // Warm the neighbours so a swipe doesn't land on a blank frame. Uses the
+  // same srcset/sizes as the viewer so it warms the file that will actually
+  // be displayed rather than the fallback.
   [index - 1, index + 1].forEach(n => {
-    if (n >= 0 && n < shots.length) new Image().src = shots[n].url;
+    if (n < 0 || n >= shots.length) return;
+    const warm = new Image();
+    warm.sizes = '100vw';
+    if (shots[n].webpSet || shots[n].jpegSet) warm.srcset = shots[n].webpSet || shots[n].jpegSet;
+    warm.src = shots[n].url;
   });
 
   // Deep links: /#p3 addresses the third photo, and the back button closes.
@@ -174,6 +203,34 @@ function applyHash() {
 
 window.addEventListener('hashchange', applyHash);
 applyHash();
+
+/* ------------------------------------------------ placeholder fade-in */
+
+/* Each tile carries a blurred 16px version of its own photo as a CSS
+   background. Fading the real image in over it means a slow connection shows
+   the picture's colours immediately instead of a grey rectangle. */
+function lightUp(img) {
+  if (img.complete && img.naturalWidth > 0) img.classList.add('lit');
+  else img.addEventListener('load', () => img.classList.add('lit'), { once: true });
+  // A broken image must not stay invisible behind the placeholder.
+  img.addEventListener('error', () => img.classList.add('lit'), { once: true });
+}
+
+document.querySelectorAll('.shot img').forEach(lightUp);
+
+/* ---------------------------------------------------- service worker */
+
+/* GitHub Pages serves assets with a ten-minute cache lifetime and there is no
+   way to configure that, so a visitor coming back an hour later re-downloads
+   every photo. A cache-first worker for the display variants is the only lever
+   available, and it makes repeat visits instant and offline-capable. */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {
+      // Caching is an optimisation; the gallery is complete without it.
+    });
+  });
+}
 
 /* --------------------------------------------- full-resolution prompt */
 

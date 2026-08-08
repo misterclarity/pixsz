@@ -145,6 +145,9 @@ async function addFiles(fileList) {
         // [{ width, height, format, blob, path, sha }] — uploaded after the
         // full-size file, and what the public gallery's srcset is built from.
         variants: out.variants || [],
+        // Blur-up placeholder and average colour for the public gallery.
+        lqip: out.lqip || '',
+        color: out.color || '',
       };
 
       await db.put(photo);
@@ -365,6 +368,8 @@ async function syncIndex() {
       height: photo.height || 0,
       bytes: photo.size || 0,
       takenAt: new Date(photo.createdAt || Date.now()).toISOString(),
+      lqip: photo.lqip || '',
+      color: photo.color || '',
       variants: (photo.variants || [])
         .filter(v => v.path)
         .map(v => ({ path: v.path, width: v.width, height: v.height, format: v.format })),

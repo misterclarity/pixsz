@@ -187,6 +187,10 @@ const photos = walk(config.photosDir)
       // What an <img src> should point at: the largest raster fallback, or the
       // full file when this photo has no variants yet.
       display: (display.length ? display[display.length - 1] : null),
+      // Placeholders come from the studio via data/photos.json — the build has
+      // no image decoder, so photos added by hand simply get none.
+      lqip: meta.lqip || '',
+      color: meta.color || '',
     };
   })
   .sort((a, b) => b.takenAt.localeCompare(a.takenAt));
@@ -239,6 +243,21 @@ function picture(p, i) {
           </picture>`;
 }
 
+/* A placeholder under each image so a slow connection shows the photo's own
+   colours rather than a grey box. "blur" inlines a 16px JPEG (~0.5–1 KB of HTML
+   per photo, which adds up past a few hundred photos); "color" is a single hex
+   value and costs nothing. */
+const PLACEHOLDER_MODE = config.images?.placeholder || 'blur';
+
+function placeholderStyle(p) {
+  if (PLACEHOLDER_MODE === 'none') return '';
+  if (PLACEHOLDER_MODE === 'blur' && p.lqip) {
+    return `background-image:url(${p.lqip});background-size:cover;background-position:center`;
+  }
+  if (p.color) return `background-color:${p.color}`;
+  return '';
+}
+
 function figures() {
   if (!photos.length) {
     return '<p class="gallery-empty">No photos published yet — check back soon.</p>';
@@ -247,14 +266,18 @@ function figures() {
     const full = encodePath(p.path);
     const web = encodePath((p.display || p).path);
     const webWidth = (p.display || p).width;
-    const ratio = p.width && p.height ? ` style="aspect-ratio:${p.width}/${p.height}"` : '';
+    // No aspect-ratio on the figure: it also wraps the caption, so the ratio
+    // never matched the box and was silently ignored. The img's width/height
+    // attributes are what actually reserve the space and prevent layout shift.
+    const ratio = '';
 
     // data-full carries the full-resolution URL for the supporter prompt. It is
     // a plain URL in the markup, not a secret — the gate is a request, not
     // access control, and pretending otherwise would be dishonest.
+    const placeholder = placeholderStyle(p);
     return `      <figure class="shot" id="p${i + 1}" data-index="${i}"${ratio}
               data-full="${full}" data-full-width="${p.width}" data-title="${esc(p.title)}">
-        <a class="shot-link" href="${web}" aria-label="View ${esc(p.title)} larger">
+        <a class="shot-link" href="${web}" aria-label="View ${esc(p.title)} larger"${placeholder ? ` style="${placeholder}"` : ''}>
           ${picture(p, i)}
         </a>
         <figcaption>

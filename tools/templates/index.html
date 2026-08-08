@@ -104,7 +104,13 @@
 <!-- Viewer -->
 <div class="viewer" id="viewer" hidden role="dialog" aria-modal="true" aria-label="Photo viewer">
   <figure class="viewer-stage">
-    <img id="viewerImg" alt="">
+    <!-- Sources are filled in per photo so the viewer picks a screen-sized
+         variant rather than always pulling the largest one. -->
+    <picture>
+      <source id="viewerWebp" type="image/webp" sizes="100vw">
+      <source id="viewerJpeg" type="image/jpeg" sizes="100vw">
+      <img id="viewerImg" alt="">
+    </picture>
   </figure>
   <div class="viewer-bar viewer-top">
     <button type="button" class="vbtn" id="viewerClose" aria-label="Close viewer">
