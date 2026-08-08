@@ -473,3 +473,7 @@ a { color: var(--accent); }
 }
 
 .gate-close:active { background: var(--bg-sunken); }
+
+/* Owner's way back to the uploader. Muted rather than hidden — see the note in
+   tools/build-gallery.mjs about why the URL isn't the thing protecting it. */
+.foot-studio { color: var(--fg-dim); }

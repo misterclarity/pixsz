@@ -7,15 +7,20 @@
   "author": "misterclarity",
   "authorUrl": "https://github.com/misterclarity",
   "locale": "en",
-
   "photosDir": "photos",
-
+  "studioLink": true,
   "images": {
-    "widths": [640, 1080, 1600],
-    "formats": ["webp", "jpeg"],
+    "widths": [
+      640,
+      1080,
+      1600
+    ],
+    "formats": [
+      "webp",
+      "jpeg"
+    ],
     "placeholder": "blur"
   },
-
   "supporterGate": {
     "enabled": true,
     "title": "Full resolution",
@@ -24,25 +29,27 @@
     "supportLabel": "Buy me a coffee",
     "bypassLabel": "Download full resolution"
   },
-
   "kofi": {
     "handle": "misterclarity",
     "label": "Support my work",
     "blurb": "These photos are free. If one of them earned its keep, a coffee is always welcome — it keeps the camera fed."
   },
-
   "license": {
     "label": "Free to download for personal use. All rights reserved.",
     "detail": "You're welcome to download these and use them privately — wallpapers, prints for your own wall, personal projects. For commercial use, redistribution, or anything published, please get in touch first.",
     "url": ""
   },
-
   "seo": {
-    "keywords": ["photography", "free photos", "download photos", "photo gallery", "misterclarity"],
+    "keywords": [
+      "photography",
+      "free photos",
+      "download photos",
+      "photo gallery",
+      "misterclarity"
+    ],
     "twitter": "",
     "imagePreview": "large"
   },
-
   "protect": {
     "blockAiCrawlers": true,
     "noaiMeta": true,

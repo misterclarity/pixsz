@@ -5,7 +5,7 @@ A personal photo site that runs entirely on GitHub Pages. Two halves:
 | | | |
 |---|---|---|
 | **`/`** | Public gallery | Pre-rendered, indexable, one-at-a-time downloads, Ko-fi link |
-| **`/studio.html`** | Private uploader | Mobile-first, `noindex`, upload from your phone |
+| **`/studio.html`** | Private uploader | **This is where you add photos.** Mobile-first, `noindex` |
 
 No build tooling, no framework, no server. Node is used once, in CI, to render
 the gallery to static HTML.
@@ -22,6 +22,15 @@ So `tools/build-gallery.mjs` renders the gallery ahead of time — real `<img>`
 tags, real alt text, real captions in the HTML — and CI runs it whenever photos
 change. The public page needs no JavaScript to work at all; the viewer is an
 enhancement layered on top.
+
+## Adding photos
+
+1. Go to **`/studio.html`** — or tap **Studio** in the gallery footer.
+2. **Add photos** picks from your camera roll; the camera button shoots a new one.
+3. They upload automatically once GitHub sync is configured (step 3 below).
+4. Tap a photo in the studio to give it a title and caption. Those become the
+   alt text on the public page, which is the part search engines read.
+5. CI rebuilds the gallery on push; the photo appears at the site root.
 
 ## The flow
 
@@ -68,7 +77,14 @@ leaving a dead link.
 
 ### 3. Connect the studio
 
-Open `/studio.html` on your phone, **Add to Home Screen**, then **Settings**:
+**The uploader lives at `/studio.html`, not at the site root.** The root is the
+public gallery and deliberately has no upload controls — a visitor should never
+see them. There's a discreet **Studio** link in the gallery footer to get you
+there; set `"studioLink": false` in `site.config.json` to remove it and rely on
+a bookmark or the installed app instead.
+
+Open `/studio.html` on your phone, **Add to Home Screen** (it then opens
+straight into the uploader like an app), then **Settings**:
 
 1. Create a **fine-grained** token at
    <https://github.com/settings/personal-access-tokens/new>

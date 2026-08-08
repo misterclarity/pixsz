@@ -454,6 +454,15 @@ for (const [key, value] of Object.entries(replacements)) {
 // The Ko-fi blocks disappear entirely rather than rendering a dead link.
 if (!kofiUrl) html = html.replace(/<!--KOFI-->[\s\S]*?<!--\/KOFI-->/g, '');
 
+/* The studio link is how the owner gets back to the uploader from their own
+   phone. It is deliberately a plain footer link: the page is noindex and
+   robots-disallowed, and the token — not the URL — is what actually gates it,
+   so hiding the address would be security theatre. Set studioLink to false to
+   drop it and rely on a bookmark or the installed PWA instead. */
+if (config.studioLink === false) {
+  html = html.replace(/<!--STUDIO-->[\s\S]*?<!--\/STUDIO-->/g, '');
+}
+
 const leftover = html.match(/\{\{([A-Z_]+)\}\}/);
 if (leftover) {
   console.error(`Template placeholder ${leftover[0]} was never filled in`);
