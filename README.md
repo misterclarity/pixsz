@@ -214,6 +214,39 @@ One service worker serves both halves of the site, because two registrations
 can't share a scope. Only the gallery is precached; the studio's assets are
 cached on first use, so a visitor never downloads an uploader they'll never open.
 
+## What is stored where
+
+| | Holds | Notes |
+|---|---|---|
+| **GitHub repo** | full-res original, display variants, `data/photos.json` | The durable copy. Everything else is derived. |
+| **Studio: IndexedDB** | full blob, thumbnail, placeholders, metadata | ~470 KB per photo once synced |
+| **Studio: localStorage** | `pixsz.settings.v1` — includes the token | |
+| **Gallery: localStorage** | `pixsz.supporter` — honesty-box flag | |
+| **Service worker caches** | `pixsz-v3` shell, `pixsz-photos-v1` variants | 120 variants, oldest-first eviction |
+
+Measured on a 2.0 MB, 4032×3024 phone photo: **1193 KB pushed to the repo**
+across 8 files, **470 KB kept on the device**.
+
+Variant blobs are dropped as soon as each one lands in the repo — nothing local
+reads them again, and keeping them was 62% of the studio's footprint. A variant
+whose upload fails keeps its blob and retries on the next run.
+
+The studio asks for `navigator.storage.persist()` at boot and again after the
+first photo is added. Without it IndexedDB is best-effort and a phone under
+storage pressure can evict the whole origin — which is survivable for synced
+photos but would silently lose anything added offline and not yet uploaded.
+Browsers grant persistence on engagement rather than on request, so it may be
+refused; **Settings → This device** reports which mode is actually in effect.
+
+### Ceilings
+
+- **GitHub Pages:** 1 GB published site, 100 GB/month soft bandwidth limit —
+  roughly 800 photos at ~1.2 MB each.
+- **The phone:** browser quota is typically a percentage of free disk; ~844 MB
+  was granted in testing, which is ~1,800 photos at 470 KB.
+- **Git history keeps every version forever.** Deleting a photo frees space on
+  the branch, not in the repo.
+
 ## Placeholders
 
 Each tile carries a blurred 16px version of its own photo, inlined as a data URI

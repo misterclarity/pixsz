@@ -81,6 +81,7 @@ async function boot() {
 
   await drainShareInbox();
   wireFileHandler();
+  requestPersistentStorage();
 
   if (state.store && state.store.configured) {
     pullRemote({ quiet: true })
@@ -95,6 +96,30 @@ async function boot() {
 function rebuildStore() {
   const gh = state.settings.gh;
   state.store = gh.token && gh.owner && gh.repo ? new GitHubStore(gh) : null;
+}
+
+/* IndexedDB is "best-effort" by default: a phone under storage pressure can
+   evict the whole origin without warning. Synced photos survive that (the repo
+   has them), but anything added offline and not yet uploaded would be lost
+   silently. Asking for persistence closes that gap.
+
+   Browsers grant it on engagement signals rather than on request — Chrome
+   effectively always grants it to an installed PWA, Safari after enough
+   interaction — so this is asked at boot and again after the first photo is
+   added, which is the strongest signal we have. */
+let persistAsked = false;
+
+async function requestPersistentStorage() {
+  if (persistAsked) return;
+  if (!navigator.storage || !navigator.storage.persist) return;
+  persistAsked = true;
+  try {
+    if (await navigator.storage.persisted()) return;
+    await navigator.storage.persist();
+  } catch {
+    // Not supported, or refused. Nothing to do — the app still works, and
+    // Settings reports which mode is in effect.
+  }
 }
 
 function registerServiceWorker() {
@@ -167,6 +192,11 @@ async function addFiles(fileList) {
   // Give the browser a beat to paint the last thumbnail before the bar vanishes.
   updateQueue();
   updateStorageInfo();
+
+  // Adding photos is the clearest signal of intent a browser will accept when
+  // deciding whether to grant persistence, so ask again here.
+  persistAsked = false;
+  requestPersistentStorage();
 }
 
 /* ------------------------------------------------------- upload queue */
@@ -256,6 +286,13 @@ async function uploadVariants(photo) {
     const up = await state.store.upload(vPath, variant.blob, `Add ${vPath.split('/').pop()}`);
     variant.path = up.path;
     variant.sha = up.sha;
+
+    // The repo now holds these bytes and nothing on this device reads them
+    // again — the grid uses the thumbnail and the viewer uses the full blob.
+    // Keeping them was ~60% of the studio's storage footprint for no purpose.
+    // Dropped only after the upload resolves, so a failure leaves the blob in
+    // place for the next attempt.
+    delete variant.blob;
     await db.put(photo);
   }
 }
@@ -955,10 +992,19 @@ async function updateStorageInfo() {
       if (usage != null && q) quota = ` · using ${formatBytes(usage)} of about ${formatBytes(q)}`;
     } catch { /* not available everywhere */ }
   }
+  let durability = '';
+  if (navigator.storage && navigator.storage.persisted) {
+    try {
+      durability = (await navigator.storage.persisted())
+        ? ' · storage is persistent'
+        : ' · storage is best-effort, so the browser may clear it under pressure';
+    } catch { /* not supported */ }
+  }
+
   $('storageInfo').textContent =
     `${local} photo${local === 1 ? '' : 's'} stored on this device`
     + (remoteOnly ? `, ${remoteOnly} loaded from the repo` : '')
-    + quota;
+    + quota + durability;
 }
 
 async function exportAll() {
