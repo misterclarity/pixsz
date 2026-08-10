@@ -25,7 +25,7 @@ const INDEX_PATH = 'data/photos.json';
 
 /* Variant sizes come from site.config.json so the studio and the build can't
    drift apart. Fetched at boot; these are the fallback if it isn't reachable. */
-let imageConfig = { widths: [640, 1080, 1600], formats: ['webp', 'jpeg'] };
+let imageConfig = { widths: [640, 1080, 1600], formats: ['webp'] };
 
 async function loadSiteConfig() {
   try {

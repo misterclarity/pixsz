@@ -161,10 +161,10 @@ The studio generates display variants at upload time and the build emits a
 instead of the original:
 
 ```
-photos/2026/08/beach.jpg          full resolution — the gated download
-photos/2026/08/beach-w640.webp    display variants, one per width per format
+photos/2026/08/beach.jpg          full resolution, JPEG — the gated download
+photos/2026/08/beach-w640.webp    display variants, WebP
 photos/2026/08/beach-w1080.webp
-photos/2026/08/beach-w1600.jpg    …
+photos/2026/08/beach-w1600.webp
 ```
 
 Measured on this repo's own gallery, six 2048px photos:
@@ -180,10 +180,31 @@ ladder is tuned for this grid: 640 covers a three-column desktop at DPR 1, and
 you change the grid in `css/gallery.css`, change the `SIZES` constant in
 `tools/build-gallery.mjs` to match, or phones will pick the wrong file.
 
-Each photo costs one upload per width per format on top of the original — with
-the defaults that's up to seven files. Drop `"formats"` to `["webp"]` to halve
-it; WebP is supported everywhere current, and the JPEG set exists only for
-browsers older than Safari 14.
+### WebP-only by default
+
+`"formats": ["webp"]` — variants are WebP and nothing else. Measured on a 2.0 MB
+4032×3024 photo:
+
+| | JPEG + WebP | WebP only |
+|---|---|---|
+| Files per photo | 8 | **5** |
+| Bytes to the repo | 1193 KB | **719 KB** (−40%) |
+
+The full-resolution original stays JPEG. It's the file people download and open
+in desktop software or send to a print shop, where `.jpg` is still the safer
+thing to hand someone.
+
+**The trade-off, stated plainly:** there is no JPEG fallback in the `<picture>`,
+so a browser that can't decode WebP shows **no photos at all** — verified by
+blocking `.webp` and watching all three tiles fail. That means Safari 13 and
+older, i.e. iOS 13 and macOS pre-Big Sur. Under 0.5% of traffic in practice, but
+it is a hard failure for them, not a degraded one. Those visitors do still see
+the coloured placeholder tiles and can reach every original through the Download
+and Full resolution links, which are JPEG.
+
+Set `"formats": ["webp", "jpeg"]` to restore the fallback. Photos already
+uploaded with both formats keep working either way — the build discovers
+whatever is on disk, and prefers JPEG for the `<img src>` when it exists.
 
 Variants are never upscaled: a 900px-wide photo gets a 640 variant and nothing
 else. Photos uploaded before this existed keep working — the build falls back to

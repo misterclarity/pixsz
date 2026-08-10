@@ -170,7 +170,15 @@ const photos = walk(config.photosDir)
     const caption = (meta.caption || '').trim();
 
     const variants = findVariants(rel, dims.width, dims.height);
-    const display = variants.filter(v => v.format !== 'webp' && v.format !== 'avif');
+
+    /* What a bare <img src> and the free download point at. Prefer JPEG when it
+       exists, since it's the safest thing to hand a browser or a download; with
+       a WebP-only config there is no JPEG, so use the largest WebP instead.
+       Falling through to the full-resolution original here would be a silent
+       failure: it would serve the heavy file on every tile *and* hand out the
+       supporter-gated original from the Download button. */
+    const jpegs = variants.filter(v => v.format === 'jpeg');
+    const display = jpegs.length ? jpegs : variants;
 
     return {
       path: rel,
